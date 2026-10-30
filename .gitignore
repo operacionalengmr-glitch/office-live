@@ -1,0 +1,5 @@
+.claude/
+__pycache__/
+*.pyc
+preview.png
+assets/sprites/_contact.png

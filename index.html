@@ -1,0 +1,87 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Office Live · M&amp;R</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<!-- bump ?v= on each release: GitHub Pages lets browsers cache files for 10 minutes -->
+<link rel="stylesheet" href="css/style.css?v=7">
+</head>
+<body>
+<div id="stage"><canvas id="game"></canvas></div>
+<div id="tvScreen"><div id="tvPlayer"></div></div>
+
+<header id="hud">
+  <div class="brand"><span class="logo">M&amp;R</span><div><b>Office Live</b><small id="clock"></small></div></div>
+  <div class="hud-btns"><button id="outBtn">🏢 Voltar ao escritório</button><button id="liveBtn"></button><button id="tvBtn">📺 TV</button><button id="lightBtn"></button><button id="namesBtn">🏷️ Nomes</button></div>
+</header>
+
+<aside id="panel">
+  <div class="phead">
+    <h2>Timesheet <span>ao vivo</span></h2>
+    <div id="counts"></div>
+  </div>
+  <ul id="list"></ul>
+  <div id="help">
+    <div><kbd>Clique</kbd> numa pessoa para ver quem é</div>
+    <div><kbd>Porta</kbd> em pausa ou fora, sai pra rua · <kbd>WASD</kbd> anda lá fora</div>
+    <div><kbd>Roda</kbd> zoom · <kbd>L</kbd> luz · <kbd>N</kbd> nomes · <kbd>Esc</kbd> fechar</div>
+  </div>
+</aside>
+
+<div id="card">
+  <canvas></canvas>
+  <div class="info">
+    <div class="nm"></div>
+    <div class="rl"></div>
+    <div class="pj"></div>
+    <q></q>
+    <div class="k"><kbd>Esc</kbd> para fechar</div>
+  </div>
+  <button id="cardClose" aria-label="Fechar">✕</button>
+</div>
+
+<div id="remote" hidden>
+  <div class="rhead"><b>📺 TV do escritório</b><button class="x" aria-label="Fechar">✕</button></div>
+  <div class="slot"><span>Nada tocando · cole um link abaixo</span></div>
+  <div class="now">
+    <div class="ttl"></div>
+    <div class="meta"><span class="by"></span><span class="time"></span></div>
+    <div class="bar"><i></i></div>
+  </div>
+  <div class="ctrls">
+    <button data-a="toggle" class="ed"></button><button data-a="skip" class="ed">⏭ Pular</button>
+    <span class="vol"><button data-a="mute" title="Som só neste computador"></button><input type="range" min="0" max="100" aria-label="Volume"></span>
+  </div>
+  <form class="add ed"><input name="url" placeholder="Cole um link do YouTube" autocomplete="off"><button>+ Fila</button></form>
+  <div class="lock">🔒 Conecte ao ponto para colocar vídeos e controlar a TV.</div>
+  <div class="qhead"><span>Fila <small></small></span><button data-a="clear" class="ed">Limpar fila</button></div>
+  <ol class="queue"></ol>
+</div>
+
+<div id="toasts"></div>
+<div id="fade"></div>
+
+<div id="login" hidden>
+  <form>
+    <h3>Conectar ao ponto</h3>
+    <p>Use o mesmo e-mail e senha do app de ponto. O jogo só lê quem está trabalhando, em pausa ou fora.</p>
+    <input type="email" name="email" required autocomplete="username" placeholder="nome@engmr.com.br">
+    <input type="password" name="password" required autocomplete="current-password" placeholder="Senha">
+    <div class="err" role="alert"></div>
+    <div class="row"><button type="button" class="cancel">Cancelar</button><button type="submit">Entrar</button></div>
+  </form>
+</div>
+
+<div id="intro">
+  <div class="title"><span class="logo big">M&amp;R</span><h1>Office Live</h1><p>Carregando o escritório…</p></div>
+  <canvas></canvas>
+  <small>clique para entrar</small>
+</div>
+
+<script type="module" src="src/main.js?v=11"></script>
+</body>
+</html>
