@@ -532,6 +532,8 @@ function drawPerson(g, t, id, x, y, dir, mode, animT, alpha = 1) {
   g.globalAlpha = 1;
 }
 export const inBattle = () => Battle.battle.active;
+export const battleFocus = () => Battle.battleFocus();
+export const zoomKick = () => Battle.zoomKick();
 // others: colleagues in the Resenha room (multiplayer); not drawn on dungeon floors or while sparring
 export function drawDun(g, t, others = []) {
   const S = dun.scene, w = dun.walker, sh = Battle.battleShake();
@@ -557,7 +559,7 @@ export function drawDun(g, t, others = []) {
       const kind = dun.hero.cls.weapon.kind, P = Battle.heroPose(t, w); // fighting poses during battles
       const fr = w.mode === 'walk' ? frame(w.id, 'walk', w.dir, Math.floor(w.animT)) : frame(w.id, 'stand', w.dir, Math.floor(t * 1.4) % 2);
       for (const tr of Battle.heroTrail()) Battle.paintGhost(g, fr, tr.x, tr.y, dun.hero.cls.color, tr.a);
-      const wpn = () => drawWeapon(g, w, P ? P.swing : 0, kind, t);
+      const wpn = () => drawWeapon(g, w, P ? P.swing : 0, kind, t, P ? P.hand : 0);
       Battle.paintFighter(g, fr, w.x, w.y, P, w.alpha, w.dir === 'up' ? wpn : null, w.dir !== 'up' ? wpn : null);
     }
   }
@@ -657,7 +659,8 @@ function statusCard(ctx, vw, vh) {
   ctx.fillText(title, tx, y + 16 * s);
   ctx.font = font(700, 28); ctx.fillStyle = '#ffffff'; ctx.fillText(String(h.hp), tx, y + 44 * s);
   const hw = ctx.measureText(String(h.hp)).width; ctx.font = font(600, 13); ctx.fillStyle = '#9aa1ac'; ctx.fillText(`/ ${h.maxHp}`, tx + hw + 6 * s, y + 44 * s);
-  ctx.fillStyle = '#4a1010'; ctx.fillRect(tx, y + 50 * s, bw, 7 * s); ctx.fillStyle = h.hp / h.maxHp < 0.3 ? '#ff5a3a' : '#e03a3a'; ctx.fillRect(tx, y + 50 * s, bw * h.hp / h.maxHp, 7 * s);
+  h._g = h._g === undefined || h._g < h.hp ? h.hp : Math.max(h.hp, h._g - h.maxHp * 0.006); // pale chunk that drains after a hit
+  ctx.fillStyle = '#4a1010'; ctx.fillRect(tx, y + 50 * s, bw, 7 * s); ctx.fillStyle = '#fff1c0'; ctx.fillRect(tx, y + 50 * s, bw * h._g / h.maxHp, 7 * s); ctx.fillStyle = h.hp / h.maxHp < 0.3 ? '#ff5a3a' : '#e03a3a'; ctx.fillRect(tx, y + 50 * s, bw * h.hp / h.maxHp, 7 * s);
   ctx.font = font(700, 18); ctx.fillStyle = '#4fe0d0'; ctx.fillText(String(h.mp), tx, y + 78 * s);
   const mw = ctx.measureText(String(h.mp)).width; ctx.font = font(600, 11); ctx.fillStyle = '#7fb7b1'; ctx.fillText(`/ ${h.maxMp} MP`, tx + mw + 5 * s, y + 78 * s);
   ctx.fillStyle = '#103634'; ctx.fillRect(tx, y + 83 * s, bw * 0.7, 5 * s); ctx.fillStyle = '#3fc9bb'; ctx.fillRect(tx, y + 83 * s, bw * 0.7 * h.mp / h.maxMp, 5 * s);

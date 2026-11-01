@@ -70,19 +70,20 @@ function poseAngle(left) {
 }
 
 // w: walker (x, y, dir, mode, animT); swing: seconds left of the current swing; kind: class weapon
-export function drawWeapon(g, w, swing, kind, t = 0) {
+// hand: 0 / 1 alternates the fists in a flurry
+export function drawWeapon(g, w, swing, kind, t = 0, hand = 0) {
   const sp = sprite(kind); if (!sp) return;
   const side = w.dir === 'left' ? -1 : 1, bob = w.mode === 'walk' ? (Math.floor(w.animT) % 2) : Math.floor(t * 1.4) % 2;
   const hx = Math.round(w.x + 8 * side), hy = Math.round(w.y - 25 + bob);
   g.save(); g.imageSmoothingEnabled = false;
   if (kind === 'fists') { // jab: the wrapped fist shoots forward and back
     const p = swing > 0 ? 1 - swing / SWING : 0, fwd = p > 0.3 && p < 0.75 ? Math.sin((p - 0.3) / 0.45 * Math.PI) * 12 : 0;
-    g.translate(hx + (fwd + 1) * side, hy + 1); g.scale(side, 1);
+    g.translate(hx + (fwd + 1 - hand * 4) * side, hy + 1 - hand * 4); g.scale(side, 1); // hand 1: the other fist, higher and behind
     if (fwd > 4) { g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(-fwd - 2, -2, fwd, 3); }
     g.drawImage(sp.c, -sp.grip[0], -sp.grip[1]);
     g.restore(); return;
   }
-  const ang = poseAngle(swing);
+  const ang = swing > 0 ? poseAngle(swing) : REST + Math.sin(t * 2.2) * 0.06; // idle: a slight sway
   g.translate(hx, hy); g.scale(side, 1);
   const p = swing > 0 ? 1 - swing / SWING : 0;
   if (p > 0.35 && p < 0.75) { // smear along the arc of the tip

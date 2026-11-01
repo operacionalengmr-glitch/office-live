@@ -375,9 +375,10 @@ function frame(now) {
   const p = inDun ? Dun.dun.walker : inGym ? Gym.gym.walker : outside ? Out.out.walker : game.selected;
   const baseZ = inDun || inGym ? Math.max(fit * 1.3, h / (11 * T)) : outside ? h / Out.OH : p ? Math.max(fit * 1.3, 2) : fit * 0.98;
   const zt = Math.max(outside || inGym || inDun ? baseZ * 0.8 : fit * 0.6, baseZ * game.userZoom);
-  const c = game.cam;
-  c.z += (zt - c.z) * Math.min(1, dt * 4);
-  let cx = p ? p.x : BW / 2, cy = p ? p.y - 24 : BH / 2;
+  const c = game.cam, bf = inDun ? Dun.battleFocus() : null; // in a fight: frame the action and punch in on hits
+  c.z += (zt * (bf ? bf.z : 1) - c.z) * Math.min(1, dt * 4);
+  if (bf) c.z *= 1 + Dun.zoomKick();
+  let cx = bf ? bf.x : p ? p.x : BW / 2, cy = bf ? bf.y - 24 : p ? p.y - 24 : BH / 2;
   const hw = w / 2 / c.z, hh = h / 2 / c.z;
   cx = BW > hw * 2 ? Math.min(BW - hw, Math.max(hw, cx)) : BW / 2;
   cy = BH > hh * 2 ? Math.min(BH - hh, Math.max(hh, cy)) : BH / 2;
