@@ -31,7 +31,7 @@ export function startBattle(ctx) {
     const hp = Math.round(def.hp * (1 + 0.15 * (ctx.depth - 1)));
     enemies.push({ def, name: count > 1 ? `${def.name} ${'ABCDE'[i]}` : def.name, x: spot.x, y: spot.y, home: { ...spot }, hp, maxHp: hp, dir: 'down', mode: 'stand', animT: 0, hurt: 0, alive: true, fade: 1, turns: 0, fx: {}, atkScale: 1 + 0.12 * (ctx.depth - 1) });
   }
-  B = { ...ctx, enemies, phase: 'intro', t: 0, anchor: { x: w.x, y: w.y }, order: [], current: null, menu: 'root', target: 0, timer: TURN_TIME, popups: [], guard: false, swing: 0, banner: { text: ctx.count ? 'TREINO!' : 'ENCONTRO!', t: 1.2 }, result: null, xp: 0, money: 0, buffs: {}, ail: {}, charge: null, bolt: null, wave: null, parts: [], stop: 0, shake: 0 };
+  B = { ...ctx, enemies, phase: 'intro', t: 0, anchor: { x: w.x, y: w.y }, order: [], current: null, menu: 'root', target: 0, timer: TURN_TIME, popups: [], guard: false, swing: 0, banner: { text: ctx.count ? 'TREINO!' : 'ENCONTRO!', t: 1.2 }, result: null, xp: 0, money: 0, buffs: {}, ail: {}, charge: null, bolt: null, wave: null, parts: [], stop: 0, shake: 0, trail: [], ha: null, flash: 0, special: false, hitAt: 0.35 };
   battle.active = true;
   for (const e of enemies) face(e, w);
   w.path = []; w.mode = 'stand';
@@ -93,14 +93,18 @@ function enemyTurn(e) {
 function win() {
   B.xp = B.enemies.reduce((s, e) => s + e.def.xp, 0); B.money = B.enemies.reduce((s, e) => s + e.def.money, 0);
   const r = B.hero.gainXp(B.xp); B.ups = r.ups; B.rankUps = r.rankUps; B.hero.money += B.money; B.hero.save();
-  B.phase = 'victory'; B.t = 0;
+  B.phase = 'victory'; B.t = 0; B.walker.dir = 'down';
 }
-function lose() { B.hero.hp = 0; B.hero.save(); B.phase = 'defeat'; B.t = 0; }
+function lose() { B.hero.hp = 0; B.hero.save(); B.phase = 'defeat'; B.t = 0; B.flash = 0.2; }
 function popup(x, y, text, color = '#ffffff', big = false) {
   const near = B.popups.filter(p => p.t < 0.4 && Math.abs(p.x - x) < 20 && Math.abs(p.y - y) < 30).length; // stack multi-hits
   B.popups.push({ x, y: y - near * 16, text, color, big, t: 0 });
 }
-function ko(e) { e.alive = false; e.fx = {}; popup(e.x, e.y - 30, 'K.O.', '#ff5a5a'); }
+function ko(e) {
+  e.alive = false; e.fx = {}; e.koT = 0; e.koDir = e.x >= B.walker.x ? 1 : -1; // falls away from you
+  popup(e.x, e.y - 30, 'K.O.', '#ff5a5a');
+  if (!aliveTargets().length) { B.stop = 0.28; B.flash = 0.2; B.shake = 8; } // the finishing blow lingers
+}
 
 /* ---------------- effects: particles, hit-stop, screen shake ---------------- */
 // burst kinds: class flavours (stars, punch, concrete, sparks, blueprint) and damage types (fire, ice, elec, magic, blade, bullet), plus heal, buff, dust
@@ -118,13 +122,90 @@ function burst(x, y, kind, n = 10, big = 1) {
   else if (kind === 'heal' || kind === 'buff') { for (let i = 0; i < n; i++) add({ x: x + rnd(-14, 14), y: y + rnd(-10, 30), vy: rnd(-60, -30), c: kind === 'heal' ? pick(['#7dff9a', '#c8ffd4']) : pick(['#9fd3ff', '#ffffff']), shape: kind === 'heal' ? 'plus' : 'sq', s: 3, life: 0.8 }); }
   else if (kind === 'dust') { for (let i = 0; i < n; i++) add({ x: x + rnd(-6, 6), vx: rnd(-30, 30), vy: rnd(-20, -5), c: 'rgba(170,160,150,.5)', shape: 'puff', s: rnd(3, 5), life: 0.45 }); }
 }
-function impact(crit) { B.stop = Math.max(B.stop, crit ? 0.11 : 0.06); B.shake = Math.max(B.shake, crit ? 7 : 3.5); }
+function impact(crit) { B.stop = Math.max(B.stop, crit ? 0.11 : 0.06); B.shake = Math.max(B.shake, crit ? 7 : 3.5); if (crit) B.flash = Math.max(B.flash, 0.14); }
 export const battleShake = () => (B && B.shake > 0 ? { x: rnd(-1, 1) * B.shake, y: rnd(-1, 1) * B.shake * 0.6 } : { x: 0, y: 0 });
-// the hero pulls back on the wind-up and leans into the blow on the strike
-export function heroLunge() {
-  if (!B || B.phase !== 'action' || B.step !== 'swing') return 0;
-  const p = 1 - B.swing / 0.35; return p > 0.3 && p < 0.8 ? Math.sin((p - 0.3) / 0.5 * Math.PI) * 4 : p <= 0.3 ? -p * 5 : 0;
+/* ---------------- fighter poses ----------------
+   Every fighter (your character, whoever it is, and each enemy) is drawn through a pose built from the battle
+   state each frame: lean (skew from the feet up), squash/stretch, hop, sidestep, fall, and a hit flash (a white
+   silhouette, then red). So any sprite sheet gets a fighting stance, wind-ups, lunges, recoils, dodges, guard
+   crouches, knock-downs and victory hops without extra frames. */
+const ease = k => k * k * (3 - 2 * k);
+const sils = new WeakMap();
+function silhouette(fr, color) {
+  let m = sils.get(fr); if (!m) sils.set(fr, m = {});
+  if (!m[color]) { const c = document.createElement('canvas'); c.width = fr.width; c.height = fr.height; const g = c.getContext('2d'); g.drawImage(fr, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = color; g.fillRect(0, 0, c.width, c.height); m[color] = c; }
+  return m[color];
 }
+const pose0 = f => ({ f, dx: 0, ax: 0, dy: 0, sx: 1, sy: 1, lean: 0, rot: 0, flash: 0, flashColor: '#ffffff' });
+const faceOf = (o, tx) => (o.dir === 'left' ? -1 : o.dir === 'right' ? 1 : tx !== undefined && tx < o.x ? -1 : 1);
+// strike curve (p 0..1): wind-up (lean back, squash) → strike (lunge `reach` px, stretch) → recover
+function strikeCurve(P, p, reach) {
+  if (p < 0.35) { const k = ease(p / 0.35); P.lean = -0.15 * k; P.sy = 1 - 0.07 * k; P.sx = 1 + 0.05 * k; P.dx = -2 * k; }
+  else if (p < 0.6) { const k = (p - 0.35) / 0.25; P.lean = -0.15 + 0.4 * k; P.sy = 0.93 + 0.13 * k; P.sx = 1.05 - 0.1 * k; P.dx = -2 + (reach + 2) * k; }
+  else { const k = ease((p - 0.6) / 0.4); P.lean = 0.25 * (1 - k); P.sy = 1.06 - 0.06 * k; P.sx = 0.95 + 0.05 * k; P.dx = reach * (1 - k); }
+}
+// your character's pose (null outside battles); P.swing drives the weapon
+export function heroPose(t, w) {
+  if (!B) return null;
+  const tgt = B.phase === 'enemy' ? B.current.e : targetEnemy() || B.victim, P = pose0(faceOf(w, tgt?.x));
+  P.swing = B.swing;
+  const bob = Math.sin(t * 7); P.sy = 1 + bob * 0.022; P.sx = 1 - bob * 0.014; // fighting stance: bouncing on the toes
+  if (w.mode === 'walk') P.lean = 0.07;
+  if (B.guard && B.phase !== 'command') { P.sy = 0.92; P.sx = 1.05; P.lean = -0.05; }
+  if (B.charge) { P.sy = 0.9 + 0.02 * Math.sin(t * 30); P.sx = 1.06; P.lean = 0.06; P.ax = rnd(-0.7, 0.7); P.flash = 0.25 + 0.2 * Math.sin(t * 18); P.flashColor = '#ffd23a'; }
+  if (B.phase === 'action' && B.step === 'dash') { P.lean = 0.22; P.sy = 1.04; P.sx = 0.96; }
+  else if (B.swing > 0) strikeCurve(P, 1 - B.swing / 0.35, B.step === 'cast' ? 1 : 5);
+  if (B.phase === 'action' && B.step === 'cast') P.dy = -4 * Math.sin(Math.min(1, B.t / 0.7) * Math.PI);
+  const a = B.ha;
+  if (a) {
+    const k = Math.min(1, a.t / a.dur), r = (1 - k) * (1 - k), s = Math.sin(k * Math.PI);
+    if (a.kind === 'hurt') { P.lean = -0.24 * r; P.dx = -7 * r; P.sy = 1 - 0.05 * r; P.flash = a.t < 0.09 ? 1 : 0.65 * r; P.flashColor = a.t < 0.09 ? '#ffffff' : '#ff3030'; }
+    else if (a.kind === 'block') { P.dx = -4 * r; P.sy = 0.92; P.sx = 1.05; P.flash = 0.6 * r; P.flashColor = '#9fd3ff'; }
+    else if (a.kind === 'dodge') { P.ax = a.side * 16 * s; P.dy = -5 * s; P.lean = -0.12 * s; }
+    else if (a.kind === 'cheer') { P.dy = -8 * s; P.sy = 1 + 0.08 * s; P.sx = 1 - 0.05 * s; P.flash = 0.35 * s; P.flashColor = a.color; }
+  }
+  if (B.phase === 'victory') { const h = B.t < 1.25 ? Math.abs(Math.sin(B.t * 5)) : 0; P.dy = -9 * h; P.sy = 1 + 0.05 * h; P.lean = 0; P.swing = 0.2275; } // hops with the weapon raised
+  if (B.phase === 'defeat') { const k = ease(Math.min(1, B.t / 0.45)); P.rot = -P.f * Math.PI / 2 * k; P.lean = 0; P.dx = 0; P.swing = 0; }
+  return P;
+}
+function enemyPose(e, t) {
+  const w = B.walker, P = pose0(e.dir === 'left' ? -1 : e.dir === 'right' ? 1 : e.x <= w.x ? 1 : -1);
+  const bob = Math.sin(t * 6 + e.x * 0.05); P.sy = 1 + bob * 0.02; P.sx = 1 - bob * 0.012;
+  if (e.mode === 'walk') P.lean = 0.1;
+  if (B.phase === 'enemy' && B.current.e === e && B.step === 'swing') {
+    const hit = B.hitAt, up = hit - 0.1;
+    if (B.t < up) { const k = ease(B.t / up); P.lean = -0.17 * k; P.sy = 1 - 0.08 * k; P.sx = 1 + 0.06 * k; P.dx = -3 * k; if (B.special) { P.flash = 0.25 + 0.25 * Math.sin(t * 40); P.flashColor = '#ff3030'; P.ax = rnd(-0.8, 0.8); } }
+    else if (B.t < hit + 0.02) { const k = Math.min(1, (B.t - up) / 0.12); P.lean = -0.17 + 0.45 * k; P.sy = 0.92 + 0.14 * k; P.sx = 1.06 - 0.11 * k; P.dx = -3 + 11 * k; }
+    else { const k = ease(Math.min(1, (B.t - hit - 0.02) / 0.35)); P.lean = 0.28 * (1 - k); P.sy = 1.06 - 0.06 * k; P.sx = 0.95 + 0.05 * k; P.dx = 8 * (1 - k); }
+  }
+  if (e.alive && e.fx.stun) P.rot = 0.08 * Math.sin(t * 9);
+  if (e.alive && e.fx.sleep) { P.lean = 0.12; P.sy = 0.94; }
+  if (e.hurt > 0) { const r = e.hurt / 0.3; P.lean = -0.22 * r; P.dx = -5 * r; P.flash = e.hurt > 0.22 ? 1 : 0.5 * r; P.flashColor = e.hurt > 0.22 ? '#ffffff' : '#ff5050'; }
+  if (!e.alive) { const k = Math.min(1, e.koT / 0.4); P.rot = e.koDir * Math.PI / 2 * ease(k); P.dy = -6 * Math.sin(k * Math.PI); P.lean = 0; P.dx = 0; P.flash = Math.max(0, 0.8 - e.koT * 3); P.flashColor = '#ffffff'; }
+  return P;
+}
+function applyPose(g, x, y, P) {
+  g.translate(Math.round(x + P.f * P.dx + P.ax), Math.round(y + P.dy));
+  if (P.rot) g.rotate(P.rot);
+  g.transform(P.sx, 0, -P.f * P.lean, P.sy, 0, 0);
+  g.translate(-x, -y);
+}
+// one fighter: shadow on the floor, then the sprite (with `behind` / `front` drawn under the same pose, e.g. the
+// weapon) and the hit flash
+export function paintFighter(g, fr, x, y, P, alpha = 1, behind = null, front = null) {
+  const air = P ? Math.max(0, -P.dy) : 0, lying = P ? Math.abs(Math.sin(P.rot)) : 0, shx = P ? x + P.f * P.dx + P.ax : x;
+  g.fillStyle = `rgba(0,0,0,${0.35 * alpha})`; g.beginPath(); g.ellipse(shx + (P ? P.rot * 14 : 0), y - 1, Math.max(4, 10 - air * 0.4 + lying * 16), Math.max(1.5, 3.5 - air * 0.12), 0, 0, Math.PI * 2); g.fill();
+  g.save(); if (P) applyPose(g, x, y, P);
+  g.globalAlpha = alpha; behind?.();
+  const px = Math.round(x - CW / 2), py = Math.round(y - FOOT);
+  g.drawImage(fr, px, py);
+  if (P && P.flash > 0) { g.globalAlpha = alpha * Math.min(1, P.flash); g.drawImage(silhouette(fr, P.flashColor), px, py); g.globalAlpha = alpha; }
+  front?.();
+  g.restore(); g.globalAlpha = 1;
+}
+// afterimages behind you while you dash in
+export const heroTrail = () => (B ? B.trail : []);
+export function paintGhost(g, fr, x, y, color, a) { g.globalAlpha = a; g.drawImage(silhouette(fr, color), Math.round(x - CW / 2), Math.round(y - FOOT)); g.globalAlpha = 1; }
 
 /* ---------------- damage ---------------- */
 function hitEnemy(e, s, k = 0) {
@@ -158,13 +239,14 @@ function inflict(e, [id, chance]) {
 function hitHero(e, power, special) {
   const w = B.walker, h = B.hero;
   if (e.fx.confused && Math.random() < 0.5) { popup(e.x, e.y - 70, 'Tonto… errou!', STATUS.confused.color); return; }
-  if (Math.random() < 0.05 + Math.max(0, heroAgi() - enemyAgi(e)) * 0.01 + (B.buffs.eva ? 0.35 : 0)) { popup(w.x, w.y - 56, 'Esquivou!', '#9fd3ff'); return; }
+  if (Math.random() < 0.05 + Math.max(0, heroAgi() - enemyAgi(e)) * 0.01 + (B.buffs.eva ? 0.35 : 0)) { popup(w.x, w.y - 56, 'Esquivou!', '#9fd3ff'); B.ha = { kind: 'dodge', t: 0, dur: 0.38, side: w.x >= e.x ? 1 : -1 }; return; }
   const atk = e.def.atk * e.atkScale * (e.fx.fear ? 0.65 : 1) * (e.fx.rage ? 1.4 : 1) * (e.fx.cold ? 0.85 : 1) * (e.fx.atkDown ? 0.7 : 1);
   let dmg = Math.max(1, Math.round(atk * power * rnd(0.85, 1.15) - h.def * buff('def') * 0.5));
   if (B.guard) dmg = Math.max(1, Math.round(dmg / 2));
   const counter = B.buffs.counter; if (counter) dmg = Math.max(1, Math.round(dmg / 2));
   if (dmg >= h.hp && B.buffs.guardian) { dmg = h.hp - 1; delete B.buffs.guardian; popup(w.x, w.y - 92, 'Aguentou firme!', '#7dff9a'); }
-  h.hp = Math.max(0, h.hp - dmg); B.hurt = 0.3; burst(w.x, w.y - 28, 'punch', 8); impact(power > 1);
+  h.hp = Math.max(0, h.hp - dmg); burst(w.x, w.y - 28, 'punch', 8); impact(power > 1);
+  B.ha = B.guard ? { kind: 'block', t: 0, dur: 0.3 } : { kind: 'hurt', t: 0, dur: 0.42 };
   popup(w.x, w.y - 56, String(dmg), '#ff6b6b', power > 1);
   if (B.guard) popup(w.x, w.y - 76, 'Guarda', '#9fd3ff');
   if (special?.status && h.hp > 0 && !B.buffs.resist && Math.random() < special.status[1]) { const [id] = special.status; B.ail[id] = STATUS[id].turns; popup(w.x, w.y - 92, STATUS[id].name, STATUS[id].color); }
@@ -196,6 +278,7 @@ function chooseSkill(i) {
 function selfSkill(s) {
   const w = B.walker, h = B.hero;
   popup(w.x, w.y - 78, s.name, '#ffd27a');
+  B.ha = { kind: 'cheer', t: 0, dur: 0.5, color: s.heal || s.rand ? '#7dff9a' : '#9fd3ff' };
   if (s.roulette) return roulette();
   const heal = s.rand ? rnd(s.rand[0], s.rand[1]) : s.heal;
   if (heal) { const n = Math.min(h.maxHp - h.hp, Math.round(h.maxHp * heal)); h.hp += n; popup(w.x, w.y - 56, '+' + n, '#7dff9a', true); burst(w.x, w.y - 20, 'heal', 14); }
@@ -246,11 +329,12 @@ function resolve() {
     const dx = e.x - w.x, dy = e.y - w.y, L = Math.hypot(dx, dy) || 1;
     targets = aliveTargets().filter(o => { const u = ((o.x - w.x) * dx + (o.y - w.y) * dy) / L, v = Math.abs((o.x - w.x) * dy - (o.y - w.y) * dx) / L; return o === e || (u > 0 && u < L + T && v < 22); });
   } else targets = e.alive ? [e] : [];
-  for (const o of targets) {
-    if (s.power || s.rand) for (let k = 0; k < (s.hits || 1) && o.alive; k++) hitEnemy(o, s, k);
-    if (s.status) inflict(o, s.status);
-    if (s.randomStatus) inflict(o, pick(s.randomStatus));
-  }
+  // multi-hit skills land one blow at a time (the weapon swings again for each), ailments after the last one
+  const hits = s.power || s.rand ? s.hits || 1 : 0, gap = 0.13;
+  B.queue = [];
+  for (let k = 0; k < hits; k++) B.queue.push({ at: B.t + k * gap, run: () => { if (k > 0 && B.step === 'swing') B.swing = 0.35 * 0.55; for (const o of targets) if (o.alive) hitEnemy(o, s, k); } });
+  B.queue.push({ at: B.t + Math.max(0, hits - 1) * gap, run: () => { for (const o of targets) { if (s.status) inflict(o, s.status); if (s.randomStatus) inflict(o, pick(s.randomStatus)); } } });
+  B.endAt = B.t + Math.max(0, hits - 1) * gap + (B.step === 'cast' ? 0.5 : 0.42);
 }
 function endHeroTurn() { B.phase = 'pause'; B.t = 0; B.menu = 'root'; }
 
@@ -304,12 +388,16 @@ export function updateBattle(dt, keys) {
   B.shake = Math.max(0, B.shake - dt * 30);
   for (const p of B.parts) { p.t += dt; p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt; }
   B.parts = B.parts.filter(p => p.t < p.life);
+  B.flash = Math.max(0, B.flash - dt);
   if (B.stop > 0) { B.stop -= dt; return; } // hit-stop: everything freezes for a beat on impact
   B.t += dt;
+  if (B.ha && (B.ha.t += dt) > B.ha.dur) B.ha = null;
+  for (const tr of B.trail) tr.a -= dt * 2.6; B.trail = B.trail.filter(tr => tr.a > 0);
+  if (B.phase === 'action' && B.step === 'dash' && Math.abs(B.t - (B.trailT ?? -1)) > 0.03) { B.trail.push({ x: w.x, y: w.y, a: 0.45 }); B.trailT = B.t; }
+  if (B.charge && Math.random() < dt * 30) B.parts.push({ x: w.x + rnd(-12, 12), y: w.y - rnd(0, 10), vx: 0, vy: rnd(-70, -40), g: 0, life: 0.5, t: 0, s: 2, c: pick(['#ffd23a', '#fff3b0']), shape: 'sq' });
   if (B.banner) { B.banner.t -= dt; if (B.banner.t <= 0) B.banner = null; }
   for (const p of B.popups) p.t += dt; B.popups = B.popups.filter(p => p.t < 1.3);
-  for (const e of B.enemies) { e.hurt = Math.max(0, e.hurt - dt); if (!e.alive) e.fade = Math.max(0, e.fade - dt * 1.5); if (e.mode === 'stand') e.animT += dt; }
-  B.hurt = Math.max(0, (B.hurt || 0) - dt);
+  for (const e of B.enemies) { e.hurt = Math.max(0, e.hurt - dt); if (!e.alive && (e.koT += dt) > 0.55) e.fade = Math.max(0, e.fade - dt * 2.2); if (e.mode === 'stand') e.animT += dt; }
   B.swing = Math.max(0, B.swing - dt);
   if (B.bolt) B.bolt.t += dt; if (B.wave) B.wave.t += dt;
   w.mode = 'stand';
@@ -342,8 +430,11 @@ export function updateBattle(dt, keys) {
   if (B.phase === 'action') {
     const e = B.victim;
     if (B.step === 'dash') { if (moveToward(w, B.dashTo, DASH, dt) || B.t > 1.2) { B.step = 'swing'; B.t = 0; B.swing = 0.35; w.setDir(e.x - w.x, e.y - w.y); } else { w.mode = 'walk'; w.animT += dt * 14; if (Math.random() < dt * 20) burst(w.x, w.y, 'dust', 2); } }
-    else if ((B.step === 'swing' && B.t > 0.18 || B.step === 'cast' && B.t > 0.32) && !B.hitDone) { B.hitDone = true; resolve(); }
-    else if (B.hitDone && B.t > (B.step === 'cast' ? 0.8 : 0.6)) { B.hitDone = false; B.bolt = B.wave = null; for (const o of B.enemies) o.home = { x: o.x, y: o.y }; endHeroTurn(); }
+    else {
+      if ((B.step === 'swing' && B.t > 0.18 || B.step === 'cast' && B.t > 0.32) && !B.hitDone) { B.hitDone = true; resolve(); }
+      while (B.queue?.length && B.t >= B.queue[0].at) B.queue.shift().run();
+      if (B.hitDone && !B.queue?.length && B.t > B.endAt) { B.hitDone = false; B.bolt = B.wave = null; for (const o of B.enemies) o.home = { x: o.x, y: o.y }; endHeroTurn(); }
+    }
     return;
   }
 
@@ -354,29 +445,26 @@ export function updateBattle(dt, keys) {
       const before = { x: e.x, y: e.y };
       const arrived = d <= REACH || moveToward(e, aim, ENEMY_SPEED * (e.fx.cold ? 0.6 : 1), dt);
       B.moved += Math.hypot(e.x - before.x, e.y - before.y);
-      if (dist(e, w) <= REACH + 4 || arrived) { e.mode = 'stand'; face(e, w); B.step = 'swing'; B.t = 0; e.turns++; }
+      if (dist(e, w) <= REACH + 4 || arrived) { // squares up; a special move gets a longer, telegraphed wind-up
+        e.mode = 'stand'; face(e, w); B.step = 'swing'; B.t = 0; e.turns++;
+        const sp = e.def.special; B.special = !!(sp && !e.fx.silence && e.turns % sp.every === 0); B.hitAt = B.special ? 0.62 : 0.35;
+        if (B.special) popup(e.x, e.y - 70, sp.name, '#ff9f80');
+      }
       else if (B.moved >= ENEMY_STEP * (e.fx.cold ? 0.6 : 1) || B.t > 2) { e.mode = 'stand'; popup(e.x, e.y - 56, 'Não alcança…', '#cfd3da'); e.home = { x: e.x, y: e.y }; endHeroTurn(); }
-    } else if (B.step === 'swing' && B.t > 0.35 && !B.hitDone) {
-      B.hitDone = true; e.lunge = 0.2;
-      const sp = e.def.special, special = sp && !e.fx.silence && e.turns % sp.every === 0;
-      if (special) popup(e.x, e.y - 70, sp.name, '#ff9f80');
-      hitHero(e, special ? sp.power : 1, special ? sp : null);
-    } else if (B.step === 'swing' && B.t > 0.8) { B.hitDone = false; e.home = { x: e.x, y: e.y }; endHeroTurn(); }
+    } else if (B.step === 'swing' && B.t > B.hitAt && !B.hitDone) {
+      B.hitDone = true;
+      hitHero(e, B.special ? e.def.special.power : 1, B.special ? e.def.special : null);
+    } else if (B.step === 'swing' && B.hitDone && B.t > B.hitAt + 0.5) { B.hitDone = false; e.home = { x: e.x, y: e.y }; endHeroTurn(); }
   }
 }
 
 /* ---------------- drawing ---------------- */
 export function battleDrawables(t) {
   if (!B) return [];
-  return B.enemies.filter(e => e.fade > 0).map(e => ({
+  return B.enemies.filter(e => e.fade > 0 && SPR[e.def.sprite]).map(e => ({
     s: e.y, draw: g => {
-      g.globalAlpha = e.fade;
       const fr = e.mode === 'walk' ? frame(e.def.sprite, 'walk', e.dir, Math.floor(e.animT)) : frame(e.def.sprite, 'stand', e.dir, Math.floor(t * 1.4) % 2);
-      g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(e.x, e.y - 1, 10, 3.5, 0, 0, Math.PI * 2); g.fill();
-      const ox = e.hurt > 0 ? Math.round(Math.sin(t * 60) * 2) : 0;
-      g.drawImage(fr, Math.round(e.x - CW / 2 + ox), Math.round(e.y - FOOT));
-      if (e.hurt > 0) { g.globalCompositeOperation = 'lighter'; g.globalAlpha = e.hurt * 1.5; g.drawImage(fr, Math.round(e.x - CW / 2 + ox), Math.round(e.y - FOOT)); g.globalCompositeOperation = 'source-over'; }
-      g.globalAlpha = 1;
+      paintFighter(g, fr, e.x, e.y, enemyPose(e, t), e.fade);
       if (e.alive && (e.fx.sleep || e.fx.stun)) { // little stars / Zzz over the head
         g.fillStyle = e.fx.sleep ? '#9fd3ff' : '#ffd23a';
         for (let k = 0; k < 3; k++) { const a = t * 3 + k * 2.1; g.fillRect(Math.round(e.x + Math.cos(a) * 10) - 1, Math.round(e.y - 62 + Math.sin(a) * 3) - 1, 3, 3); }
@@ -384,7 +472,6 @@ export function battleDrawables(t) {
     },
   }));
 }
-export const batSwing = () => (B ? B.swing : 0);
 export function drawBattleWorld(g, t) {
   if (!B) return;
   const w = B.walker;
@@ -412,6 +499,18 @@ export function drawBattleWorld(g, t) {
       g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
     }
   }
+  if (B.guard && B.phase !== 'command') { g.strokeStyle = `rgba(159,211,255,${0.35 + 0.15 * Math.sin(t * 6)})`; g.lineWidth = 2; g.beginPath(); g.ellipse(w.x, w.y - 26, 18, 30, 0, 0, Math.PI * 2); g.stroke(); g.lineWidth = 1; }
+  if (B.phase === 'action' && B.step === 'cast' && B.t < 0.34 && B.bolt) { // energy gathering in the hand
+    const f = faceOf(w, B.victim?.x); g.globalCompositeOperation = 'lighter'; g.fillStyle = B.bolt.color;
+    g.globalAlpha = 0.35; g.beginPath(); g.arc(w.x + f * 10, w.y - 27, 9 + 3 * Math.sin(t * 30), 0, Math.PI * 2); g.fill();
+    g.globalAlpha = 0.9; g.beginPath(); g.arc(w.x + f * 10, w.y - 27, 3 + B.t * 8, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+  }
+  if (B.phase === 'enemy' && B.step === 'swing') {
+    const e = B.current.e, f = e.x <= w.x ? 1 : -1;
+    if (B.special && B.t < B.hitAt - 0.1) { const y = Math.round(e.y - 76 + Math.sin(t * 20) * 1.5); g.fillStyle = '#1c1f27'; g.fillRect(e.x - 4, y - 1, 8, 15); g.fillStyle = '#ff3b3b'; g.fillRect(e.x - 3, y, 6, 8); g.fillRect(e.x - 3, y + 10, 6, 3); } // telegraph
+    const k = (B.t - (B.hitAt - 0.1)) / 0.22;
+    if (k > 0 && k < 1) { const a0 = f > 0 ? -1.3 : Math.PI + 1.3; g.strokeStyle = `rgba(255,255,255,${0.85 * (1 - k)})`; g.lineWidth = 4; g.lineCap = 'round'; g.beginPath(); g.arc(e.x + f * 8, e.y - 28, 18, Math.min(a0, a0 + f * 2.4 * ease(k)), Math.max(a0, a0 + f * 2.4 * ease(k))); g.stroke(); g.lineWidth = 1; } // swoosh of the blow
+  }
   for (const p of B.parts) {
     if (p.t < 0) continue;
     const k = p.t / p.life, x = Math.round(p.x), y = Math.round(p.y);
@@ -436,6 +535,7 @@ function bar(ctx, x, y, w, h, k, col, back) { ctx.fillStyle = back; ctx.fillRect
 const TARGET_NAME = { one: 'um alvo', around: 'área', all: 'todos', line: 'linha', self: 'você' };
 export function drawBattleHud(ctx, vw, vh, t, toScreen) {
   if (!B) return;
+  if (B.flash > 0) { ctx.fillStyle = B.phase === 'defeat' ? `rgba(255,40,40,${B.flash * 1.6})` : `rgba(255,255,255,${B.flash * 2.2})`; ctx.fillRect(0, 0, vw, vh); } // impact flash
   const font = (wt, px) => `${wt} ${px}px "Pixelify Sans", system-ui, sans-serif`;
   ctx.textBaseline = 'middle';
   // enemy names, HP and ailments over their heads
@@ -513,6 +613,5 @@ export function drawBattleHud(ctx, vw, vh, t, toScreen) {
     ctx.textAlign = 'left'; ctx.globalAlpha = 1;
   }
 }
-export const battleHurt = () => (B ? B.hurt || 0 : 0);
 // leaving the basement mid-fight (HUD button, timer started): drop the battle without results
 export function abortBattle() { if (!B) return; battle.active = false; B = null; }

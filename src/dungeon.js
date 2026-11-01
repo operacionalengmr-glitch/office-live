@@ -554,12 +554,11 @@ export function drawDun(g, t, others = []) {
     }
     else if (it.npc) { if (SPR[NPC_ID]) drawPerson(g, t, NPC_ID, (HUB_NPC.tx + 0.5) * T, (HUB_NPC.ty + 1) * T - 2, 'down', 'stand', 0); }
     else {
-      const kind = dun.hero.cls.weapon.kind, sw = Battle.batSwing();
-      if (w.dir === 'up') drawWeapon(g, w, sw, kind, t);
-      const lx = Battle.heroLunge() * (w.dir === 'left' ? -1 : w.dir === 'right' ? 1 : 0), ly = Battle.heroLunge() * (w.dir === 'up' ? -1 : w.dir === 'down' ? 1 : 0);
-      drawPerson(g, t, w.id, w.x + lx, w.y + ly, w.dir, w.mode, w.animT, w.alpha);
-      if (Battle.battleHurt() > 0) { g.globalCompositeOperation = 'lighter'; g.globalAlpha = Battle.battleHurt(); g.fillStyle = '#ff2020'; g.beginPath(); g.ellipse(w.x, w.y - 26, 14, 28, 0, 0, Math.PI * 2); g.fill(); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; }
-      if (w.dir !== 'up') drawWeapon(g, w, sw, kind, t);
+      const kind = dun.hero.cls.weapon.kind, P = Battle.heroPose(t, w); // fighting poses during battles
+      const fr = w.mode === 'walk' ? frame(w.id, 'walk', w.dir, Math.floor(w.animT)) : frame(w.id, 'stand', w.dir, Math.floor(t * 1.4) % 2);
+      for (const tr of Battle.heroTrail()) Battle.paintGhost(g, fr, tr.x, tr.y, dun.hero.cls.color, tr.a);
+      const wpn = () => drawWeapon(g, w, P ? P.swing : 0, kind, t);
+      Battle.paintFighter(g, fr, w.x, w.y, P, w.alpha, w.dir === 'up' ? wpn : null, w.dir !== 'up' ? wpn : null);
     }
   }
   Battle.drawBattleWorld(g, t);
