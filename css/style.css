@@ -172,3 +172,57 @@ body.live .st { display: none; }
   #remote { top: auto; bottom: 8px; left: 8px; right: 8px; width: auto; max-height: calc(100% - 70px); }
   #login input { font-size: 16px; } /* stops iOS from zooming into the field */
 }
+
+/* TP shortcut to the Resenha */
+
+/* Resenha bar panels: wardrobe (classes) and the host's sparring offer */
+#dunUi { position: fixed; inset: 0 var(--panelW) 0 0; z-index: 9; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .45); padding: 16px; }
+#dunUi[hidden] { display: none; }
+#dunUi .box { position: relative; background: rgba(12, 10, 14, .96); border: 1px solid #5a3420; border-top: 3px solid #e0b25a; border-radius: 12px; padding: 14px 16px; color: #eee; box-shadow: 0 16px 50px rgba(0, 0, 0, .6); animation: up .2s ease-out; max-height: 100%; display: flex; flex-direction: column; }
+#dunUi .x { position: absolute; top: 8px; right: 10px; background: none; border: 0; color: #aaa; font-size: 15px; }
+#dunUi h3 { margin: 0 0 10px; font: 700 18px var(--pixel); color: #f2c14e; }
+#dunUi h3 small { font: 400 11px var(--mono); color: #9aa1ac; margin-left: 6px; }
+#dunUi button { font: 600 12px var(--pixel); color: #eee; background: #1d1a1f; border: 1px solid #3a2a2d; border-radius: 8px; padding: 7px 11px; }
+#dunUi button:hover:not(:disabled) { border-color: #e0b25a; }
+#dunUi.wardrobe .box { width: min(860px, 100%); height: min(620px, 100%); }
+#dunUi .wr { display: grid; grid-template-columns: 220px 1fr; gap: 12px; min-height: 0; flex: 1; }
+#dunUi nav { overflow: auto; display: flex; flex-direction: column; gap: 4px; padding-right: 4px; }
+#dunUi nav button { display: grid; grid-template-columns: 10px 1fr; column-gap: 8px; text-align: left; padding: 6px 8px; }
+#dunUi nav button i { grid-row: span 2; width: 10px; border-radius: 3px; }
+#dunUi nav button b { font: 600 13px var(--pixel); }
+#dunUi nav button small { color: #8a8f99; font-size: 10px; }
+#dunUi nav button.on { background: #2a2026; border-color: #e0b25a; }
+#dunUi nav button.worn b::after { content: ' ✓'; color: #7dff9a; }
+#dunUi section { overflow: auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; }
+#dunUi .hd { display: flex; gap: 10px; align-items: center; }
+#dunUi .hd > i { width: 34px; height: 34px; border-radius: 8px; flex: none; }
+#dunUi .hd h4 { margin: 0; font: 700 20px var(--pixel); color: #fff; }
+#dunUi .hd small { color: #9aa1ac; font-size: 11px; display: flex; align-items: center; gap: 6px; }
+#dunUi .bar { display: inline-block; width: 70px; height: 5px; background: #2a2d34; border-radius: 3px; overflow: hidden; }
+#dunUi .bar i { display: block; height: 100%; background: #9fd3ff; }
+#dunUi .ds { margin: 0; color: #cfd3da; font-size: 12px; }
+#dunUi .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 12px; }
+#dunUi .st { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #9aa1ac; }
+#dunUi .st span { width: 62px; }
+#dunUi .st em { flex: 1; height: 6px; background: #2a2d34; border-radius: 3px; overflow: hidden; }
+#dunUi .st em i { display: block; height: 100%; }
+#dunUi .sk { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+#dunUi .sk li { display: grid; grid-template-columns: 30px 1fr auto; gap: 8px; align-items: start; background: #18151a; border: 1px solid #2a2226; border-radius: 8px; padding: 6px 8px; }
+#dunUi .sk li.lock { opacity: .45; }
+#dunUi .sk .rk { font: 700 11px var(--pixel); color: #111; background: #f2c14e; border-radius: 4px; text-align: center; padding: 2px 0; }
+#dunUi .sk b { font: 600 13px var(--pixel); color: #fff; margin-right: 6px; }
+#dunUi .sk small { color: #8a8f99; font-size: 10px; }
+#dunUi .sk p { margin: 2px 0 0; font-size: 11px; color: #cfd3da; }
+#dunUi .sk .mp { font: 700 11px var(--pixel); color: #4fe0d0; }
+#dunUi .ft { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; position: sticky; bottom: 0; background: rgba(12, 10, 14, .96); padding-top: 6px; }
+#dunUi .ft label { font-size: 11px; color: #9aa1ac; display: flex; gap: 6px; align-items: center; }
+#dunUi .go { background: #e0b25a !important; color: #1a1208 !important; border-color: #e0b25a !important; }
+#dunUi .go:disabled { opacity: .5; }
+#dunUi.host .box { width: min(420px, 100%); gap: 10px; }
+#dunUi .say { margin: 0; color: #e9e4da; font-size: 12px; line-height: 1.5; }
+#dunUi .lvl { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #9aa1ac; }
+#dunUi .lvl b { font: 700 16px var(--pixel); color: #fff; min-width: 18px; text-align: center; }
+#dunUi .lvl button { padding: 2px 10px; }
+#dunUi .opts { display: flex; gap: 6px; flex-wrap: wrap; }
+#dunUi .tip { color: #8a8f99; font-size: 10px; }
+@media (max-width: 760px) { #dunUi { inset: 0; } #dunUi .wr { grid-template-columns: 1fr; } #dunUi nav { flex-direction: row; overflow-x: auto; max-height: 64px; } #dunUi nav button { min-width: 150px; } }

@@ -16,6 +16,7 @@ const CURB = 11 * T - 4, ROAD0 = 11 * T + 10, ROAD1 = 17 * T, SB = 19 * T; // ro
 // Across the avenue the Smart Fit sits in front of the Excelsior, a little to its left.
 const X = { side0: 320, side1: 448, neighbour: 480, excelsior: 608, houses: 992, tns: 1312, armazem: 1504, lot: 1824 };
 const DOOR = { x0: 22 * T, x1: 24 * T, tx: 23, ty: 8 };  // Excelsior entrance (top of the black stairs)
+const GYM = { x0: 20 * T, x1: 22 * T, tx: 20, ty: 18 }; // Smart Fit entrance, on the far sidewalk (tiles 20-21)
 const OLD_DOOR_X0 = 928; // the Excelsior block below is painted in its original coordinates and shifted into place
 const WALK = 74, RUN = 146;
 
@@ -250,8 +251,23 @@ function paintFar(g) {
   lot(X.side1, 160, '#9a958c', '#b7bcc2'); for (let xx = X.side1; xx < X.side1 + 160; xx += 12) R(g, xx, SB + 4 + (xx % 3) * 3, 8, 4, '#857f74');
   R(g, X.side1 + 60, SB + 4, 14, 14, '#ffffff'); pe(g, X.side1 + 67, SB + 11, 6, 6, '#c62828'); pe(g, X.side1 + 67, SB + 11, 4, 4, '#ffffff'); R(g, X.side1 + 65, SB + 8, 4, 6, '#1b1b1b');
   // Smart Fit: across the avenue, in front of the Excelsior and a little to its left
-  lot(608, 256, '#f5c400', '#d4cfc2'); R(g, 608, SB + 15, 256, 7, '#1b1b1b'); ptext(g, 'SMART FIT', 680, SB + 3, '#1b1b1b', 2);
-  ac(640, SB + 44); ac(720, SB + 52); ac(800, SB + 44);
+  { const x0 = 608, w = 256, Y = '#f5c400';
+    R(g, x0, SB, w, 22, '#141414'); R(g, x0, SB + 22, w, OH - SB - 22, '#3a3d44');
+    for (let yy = SB + 26; yy < OH; yy += 5) R(g, x0, yy, w, 1, '#33363c');
+    for (const sx of [x0 + 120, x0 + 190]) { R(g, sx, SB + 36, 44, 12, '#5d6470'); R(g, sx + 1, SB + 37, 42, 10, '#8fb3d9'); R(g, sx + 2, SB + 38, 12, 2, '#d6ecf8'); }
+    ac(x0 + 30, SB + 44); ac(x0 + 60, SB + 60);
+    R(g, x0, SB, w, 2, Y); R(g, x0, SB + 2, w, 1, '#ffe27a'); R(g, x0, SB + 20, w, 2, '#c99a00');
+    R(g, x0, SB, 6, 22, Y); R(g, x0 + w - 6, SB, 6, 22, Y);
+    // big logo on the glass: "smart" white, "fit" yellow with its smile
+    ptext(g, 'SMART', x0 + 120, SB + 6, '#ffffff', 2); ptext(g, 'FIT', x0 + 164, SB + 6, Y, 2);
+    R(g, x0 + 164, SB + 17, 22, 2, Y); R(g, x0 + 184, SB + 15, 2, 2, Y);
+    for (let xx = x0 + 70; xx < x0 + w - 10; xx += 22) R(g, xx, SB + 4, 1, 15, '#262a33');
+    // entrance: lit glass doors under the yellow portal, with the perforated yellow panel beside it
+    R(g, GYM.x0 + 2, SB, GYM.x1 - GYM.x0 - 4, 22, Y); R(g, GYM.x0 + 6, SB + 3, GYM.x1 - GYM.x0 - 12, 19, '#1d2a38');
+    R(g, (GYM.x0 + GYM.x1) / 2 - 1, SB + 3, 2, 19, '#0d1218'); R(g, GYM.x0 + 9, SB + 5, 3, 14, 'rgba(255,255,255,.18)');
+    R(g, GYM.x0 + 6, SB + 3, GYM.x1 - GYM.x0 - 12, 2, '#ffe9a8');
+    R(g, GYM.x1, SB + 2, 14, 20, Y); for (let yy = SB + 4; yy < SB + 21; yy += 3) for (let xx = GYM.x1 + 2; xx < GYM.x1 + 13; xx += 3) R(g, xx, yy, 1, 1, '#c99a00');
+  }
   // 623 · Repondo by Alfamec
   lot(864, 96, '#e8622a', '#cfd3d8'); for (let xx = 866; xx < 960; xx += 4) for (let yy = SB + 2; yy < SB + 20; yy += 4) R(g, xx, yy, 1, 1, '#b84a1c');
   R(g, 868, SB + 3, 88, 16, '#141414'); pe(g, 878, SB + 11, 5, 5, '#e8622a'); ptext(g, 'REPONDO', 886, SB + 6, '#e8622a', 1); ptext(g, 'BY ALFAMEC', 886, SB + 12, '#f4f1ec');
@@ -316,6 +332,11 @@ function buildProps() {
     });
   }
   for (const tx of [44, 52]) { block(tx, 18); obj(tx * T - 16, 18 * T - 74, 64, 100, 18 * T + 24, g => tree(g, 32, 98, 0.95)); }
+  block(18, 18); obj(18 * T, 18 * T - 74, 32, 100, 18 * T + 24, g => {
+    shadow(g, 6, 92, 20, 6, 0.3);
+    R(g, 8, 4, 16, 90, '#1c1f27'); R(g, 9, 5, 14, 88, '#141414'); R(g, 9, 5, 7, 88, '#f5c400'); R(g, 9, 5, 7, 2, '#ffe27a');
+    ptext(g, 'F', 17, 16, '#f5c400'); ptext(g, 'I', 17, 23, '#f5c400'); ptext(g, 'T', 17, 30, '#f5c400');
+  });
   for (const tx of [19, 22, 26]) { block(tx, 18); obj(tx * T - 16, 18 * T - 36, 64, 62, 18 * T + 24, g => palm(g, 32, 60)); }
   block(29, 18); obj(29 * T - 24, 18 * T - 110, 80, 136, 18 * T + 24, g => {
     shadow(g, 30, 128, 20, 6, 0.3); R(g, 37, 50, 8, 82, '#cfd3d8'); R(g, 37, 50, 2, 82, '#e9ecef');
@@ -353,9 +374,10 @@ function updateTraffic(dt, w) {
 
 /* ---------------- the walker ---------------- */
 class Walker {
-  constructor(actor) {
+  constructor(actor, from) {
     this.a = actor; this.id = actor.id; this.x = DOOR.tx * T; this.y = NB + 6; this.dir = 'down';
-    this.mode = 'walk'; this.path = [{ x: this.x, y: 10 * T + 8 }]; this.animT = 0; this.alpha = 0; this.fade = 1; this.goIn = false;
+    this.mode = 'walk'; this.path = [{ x: this.x, y: 10 * T + 8 }]; this.animT = 0; this.alpha = 0; this.fade = 1; this.goIn = false; this.goGym = false;
+    if (from === 'gym') { this.x = (GYM.x0 + GYM.x1) / 2; this.y = SB + 6; this.dir = 'up'; this.path = [{ x: this.x, y: 18 * T + 2 }]; }
   }
   get headX() { return this.x; }
   get headY() { return this.y - SPR[this.id].meta.down.h - 4; }
@@ -365,17 +387,18 @@ class Walker {
   }
   update(dt, keys) {
     this.alpha = Math.max(0, Math.min(1, this.alpha + dt * 2.5 * this.fade));
-    if (this.fade < 0) { this.y -= 20 * dt; this.dir = 'up'; this.mode = 'walk'; this.animT += dt * 8; return; }
+    if (this.fade < 0) { this.y += (this.goGym ? 20 : -20) * dt; this.dir = this.goGym ? 'down' : 'up'; this.mode = 'walk'; this.animT += dt * 8; return; }
     let vx = (keys.right ? 1 : 0) - (keys.left ? 1 : 0), vy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
     let moving = false;
     if (vx || vy) {
-      this.path = []; this.goIn = false;
+      this.path = []; this.goIn = false; this.goGym = false;
       const n = Math.hypot(vx, vy), sp = (keys.run ? RUN : WALK) * dt;
       vx /= n; vy /= n;
       if (!blockedOut(this.x + vx * sp, this.y)) this.x += vx * sp;
       if (!blockedOut(this.x, this.y + vy * sp)) this.y += vy * sp;
       this.setDir(vx, vy); moving = true;
       if (vy < 0 && atDoor(this)) this.goIn = true;
+      if (vy > 0 && atGym(this)) this.goGym = true;
     } else if (this.path.length) {
       let rem = WALK * dt;
       while (rem > 0 && this.path.length) {
@@ -387,6 +410,7 @@ class Walker {
       moving = true;
     }
     if (this.goIn && !this.path.length && atDoor(this)) this.fade = -1;
+    if (this.goGym && !this.path.length && atGym(this)) this.fade = -1;
     this.mode = moving ? 'walk' : 'stand';
     this.animT += dt * (moving ? (keys.run ? 13 : 8) : 1);
   }
@@ -400,17 +424,20 @@ function drawWalker(g, t, w) {
   g.globalAlpha = 1;
 }
 const atDoor = w => w.x > DOOR.x0 + 4 && w.x < DOOR.x1 - 4 && w.y < NB + T;
+const atGym = w => w.x > GYM.x0 + 6 && w.x < GYM.x1 - 6 && w.y > SB - 10;
 
-/* ---------------- colleagues on the street (multiplayer) ----------------
+/* ---------------- colleagues out of the office (multiplayer) ----------------
    Positions arrive over Realtime (main.js); each one eases towards its last reported spot and fades
-   out if it stops reporting. Drawn only while you're outside yourself. */
+   out if it stops reporting. `at` says where they are: 'street', 'gym0' / 'gym1' (Smart Fit floors) or
+   'hub' (the Resenha room); each scene draws only the ones in it. */
 const REMOTE_TIMEOUT = 6000;
-export const others = new Map(); // id -> { id, x, y, tx, ty, dir, mode, animT, alpha, gone, seen, run }
+export const others = new Map(); // id -> { id, at, x, y, tx, ty, dir, mode, animT, alpha, gone, seen, run }
 export function remoteUpdate(m) {
   if (!m || !SPR[m.id]) return;
   let r = others.get(m.id);
   if (m.bye) { if (r) r.gone = true; return; }
-  if (!r) { r = { id: m.id, x: m.x, y: m.y, dir: m.dir || 'down', mode: 'stand', animT: 0, alpha: 0 }; others.set(m.id, r); }
+  const at = m.at || 'street';
+  if (!r || r.at !== at) { r = { id: m.id, at, x: m.x, y: m.y, dir: m.dir || 'down', mode: 'stand', animT: 0, alpha: 0 }; others.set(m.id, r); } // new place: appear there
   Object.assign(r, { tx: m.x, ty: m.y, faceTo: m.dir, run: !!m.run, gone: false, seen: performance.now() });
 }
 export function tickRemotes(dt) { // called every frame by main.js, inside or out
@@ -433,21 +460,22 @@ export function tickRemotes(dt) { // called every frame by main.js, inside or ou
     r.headY = r.y - SPR[id].meta.down.h - 4;
   }
 }
-// ids of colleagues currently out on the street (hidden from the office scene meanwhile)
+// ids of colleagues currently out (street, gym or Resenha room): hidden from the office scene meanwhile
 export const isOutside = id => { const r = others.get(id); return !!r && !r.gone; };
-export const visibleOthers = () => [...others.values()].filter(r => r.alpha > 0.05 && (!out.walker || r.id !== out.walker.id));
+export const visibleOthers = (at = 'street', selfId = out.walker?.id) => [...others.values()].filter(r => r.at === at && r.alpha > 0.05 && r.id !== selfId);
 
 /* ---------------- scene API ---------------- */
-let bg = null, far = null, onLeave = null;
+let bg = null, far = null, onLeave = null, onGym = null;
 export const out = { active: false, walker: null };
 
-export function enterOutside(actor, leave) {
+// opts.gym(actor): walked into the Smart Fit; opts.from === 'gym': start at its door
+export function enterOutside(actor, leave, opts = {}) {
   if (!bg) {
     const [b, bgg] = cv(OW, OH); paintBack(bgg); bg = b;
     const [f, fgg] = cv(OW, OH); paintFar(fgg); far = f;
     buildProps(); buildTraffic();
   }
-  onLeave = leave; out.walker = new Walker(actor); out.active = true;
+  onLeave = leave; onGym = opts.gym || null; out.walker = new Walker(actor, opts.from); out.active = true;
 }
 export function leaveOutside() {
   if (!out.active) return;
@@ -456,25 +484,30 @@ export function leaveOutside() {
   onLeave?.(a);
 }
 export const overDoor = (x, y) => x >= DOOR.x0 - 4 && x < DOOR.x1 + 4 && y >= NB - 64 && y < NB + 30;
+export const overGym = (x, y) => x >= GYM.x0 - 4 && x < GYM.x1 + 4 && y >= SB - 20 && y < SB + 24;
 
 // click: walk there; clicking the Excelsior's door walks in
 export function clickOutside(x, y) {
   const w = out.walker; if (!w || w.fade < 0) return;
-  const toDoor = overDoor(x, y);
-  let tx = toDoor ? DOOR.tx : Math.floor(x / T), ty = toDoor ? DOOR.ty : Math.floor((y - 2) / T);
+  const toDoor = overDoor(x, y), toGym = !toDoor && overGym(x, y);
+  let tx = toDoor ? DOOR.tx : toGym ? GYM.tx : Math.floor(x / T), ty = toDoor ? DOOR.ty : toGym ? GYM.ty : Math.floor((y - 2) / T);
   tx = Math.max(0, Math.min(OMW - 1, tx)); ty = Math.max(8, Math.min(18, ty));
   if (solid[ty][tx]) { for (const dy of [1, -1, 2, -2]) if (solid[ty + dy]?.[tx] === 0) { ty += dy; break; } }
   const p = findPath(Math.floor(w.x / T), Math.floor((w.y - 2) / T), tx, ty, solid);
   if (!p) return;
-  if (p.length) p[p.length - 1] = toDoor ? { x: DOOR.tx * T, y: NB + 10 } : { x: Math.max(10, Math.min(OW - 10, x)), y: p[p.length - 1].y };
-  w.path = p; w.goIn = toDoor;
+  const end = toDoor ? { x: DOOR.tx * T, y: NB + 10 } : toGym ? { x: (GYM.x0 + GYM.x1) / 2, y: SB - 4 } : { x: Math.max(10, Math.min(OW - 10, x)), y: p.length ? p[p.length - 1].y : w.y };
+  if (p.length) p[p.length - 1] = end; else p.push(end);
+  w.path = p; w.goIn = toDoor; w.goGym = toGym;
 }
 
 export function updateOutside(dt, keys) {
   const w = out.walker;
   w.update(dt, keys);
   updateTraffic(dt, w);
-  if (w.fade < 0 && w.alpha <= 0) leaveOutside();
+  if (w.fade < 0 && w.alpha <= 0) {
+    if (w.goGym) { out.active = false; out.walker = null; onGym?.(w.a); } // into the Smart Fit
+    else leaveOutside();
+  }
 }
 
 let dark = null, dg = null;

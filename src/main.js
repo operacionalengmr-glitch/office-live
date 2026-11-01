@@ -8,6 +8,8 @@ import * as UI from './ui.js';
 import * as Live from './supabase.js';
 import * as TVR from './tv.js';
 import * as Out from './outside.js';
+import * as Gym from './smartfit.js';
+import * as Dun from './dungeon.js';
 
 const cvs = document.getElementById('game'), ctx = cvs.getContext('2d');
 const stage = document.getElementById('stage');
@@ -31,7 +33,9 @@ game.setStatus = (id, st) => {
   else if (was === 'offline') UI.toast(`${a.short} chegou`, STATUS.working.color);
   else UI.toast(st === 'break' ? `${a.short} foi tomar um café ☕` : `${a.short} voltou ao trabalho`, STATUS[st].color);
   game.emit('status', { id, status: st });
-  if (a.outside && st === 'working') Out.leaveOutside(); // the timer is running again: back to the office
+  if (a.outside && st === 'working') { // the timer is running again: back to the office
+    if (Dun.dun.active) Dun.leaveDun('office'); else if (Gym.gym.active) Gym.leaveGym('office'); else Out.leaveOutside();
+  }
   UI.refreshPanel();
   return true;
 };
@@ -83,11 +87,39 @@ game.walkOut = () => {
 };
 game.onExit = a => fade(() => {
   game.deselect();
-  Out.enterOutside(a, back);
+  toStreet(a);
   document.body.classList.add('outside');
-  const w = Out.out.walker; game.cam.x = w.x; game.cam.y = w.y;
   UI.toast(`${a.short} saiu pra rua · setas/WASD ou clique pra andar`, STATUS.break.color);
 });
+function toStreet(a, from) {
+  Out.enterOutside(a, back, { gym: enterGym, from });
+  const w = Out.out.walker; game.cam.x = w.x; game.cam.y = w.y;
+}
+// the Smart Fit across the avenue (smartfit.js): in through its door, out the same way or straight to the office
+function enterGym(a) {
+  fade(() => {
+    Gym.enterGym(a, leftGym);
+    const w = Gym.gym.walker; game.cam.x = w.x; game.cam.y = w.y;
+    UI.toast(`${a.short} entrou na Smart Fit · a escada no canto esquerdo sobe pro 1º andar`, '#f5c400');
+  });
+}
+function leftGym(a, how) {
+  if (how === 'office') back(a);
+  else if (how === 'down') enterBasement(a, 'gym');
+  else fade(() => toStreet(a, 'gym'));
+}
+// the Resenha under the Smart Fit (dungeon.js): living room hub + procedural dungeon
+function enterBasement(a, from) {
+  fade(() => {
+    Dun.enterDun(a, leftBasement, from);
+    document.body.classList.add('outside');
+    const w = Dun.dun.walker; game.cam.x = w.x; game.cam.y = w.y;
+  });
+}
+function leftBasement(a, how) {
+  if (how === 'office') back(a);
+  else fade(() => { Gym.enterGym(a, leftGym, 'basement'); const w = Gym.gym.walker; game.cam.x = w.x; game.cam.y = w.y; });
+}
 function back(a) {
   fade(() => {
     a.outside = false; game.keys = {};
@@ -96,11 +128,12 @@ function back(a) {
     if (a.status !== 'offline') game.returning = a;
   });
 }
-game.comeBack = () => Out.leaveOutside();
+game.comeBack = () => (Dun.dun.active ? Dun.leaveDun('office') : Gym.gym.active ? Gym.leaveGym('office') : Out.leaveOutside());
 
 /* ---------------- street sync (multiplayer) ----------------
    While signed in, join the private "office-street" channel: receive colleagues' positions all the time
-   (so the office can hide whoever is outside) and, while you're out as your own character, send yours
+   (so the office can hide whoever is out) and, while you're on the street, in the Smart Fit or in the Resenha room
+   as your own character, send yours
    ~8x a second when it changes plus a heartbeat every 2 s. 'bye' when you go back in. */
 let street = null, streetOut = false, lastSent = 0, lastSig = '';
 async function joinStreet() {
@@ -112,17 +145,28 @@ function leaveStreet() {
   if (street) { if (streetOut && game.meId) street.send('bye', { id: game.meId }); street.leave(); }
   street = null; streetOut = false; Out.others.clear();
 }
+let lastAt = null;
+// where you are, if it's a shared place: the street, a Smart Fit floor or the Resenha room (not the dungeon,
+// not while sparring on the mat, not the office)
+function sharedPlace() {
+  if (Out.out.active) { const w = Out.out.walker; return w && w.fade >= 0 ? { w, at: 'street' } : null; }
+  if (Gym.gym.active) return { w: Gym.gym.walker, at: 'gym' + Gym.gym.floor };
+  if (Dun.dun.active && Dun.dun.scene?.kind === 'hub' && !Dun.inBattle()) return { w: Dun.dun.walker, at: 'hub' };
+  return null;
+}
 function syncStreet(now) {
   if (!street || !game.meId) return;
-  const w = Out.out.active ? Out.out.walker : null;
-  if (!w || w.id !== game.meId || w.fade < 0) {
-    if (streetOut) { street.send('bye', { id: game.meId }); streetOut = false; }
+  const p = sharedPlace(), w = p?.w;
+  if (!w || w.id !== game.meId) {
+    if (streetOut) { street.send('bye', { id: game.meId }); streetOut = false; lastAt = null; }
     return;
   }
+  if (lastAt === 'street' && p.at !== 'street') street.send('bye', { id: w.id }); // older clients only know the street
   streetOut = true;
   const msg = { id: w.id, x: Math.round(w.x), y: Math.round(w.y), dir: w.dir, run: !!game.keys.run };
-  const sig = msg.x + ',' + msg.y + ',' + msg.dir;
-  if ((sig !== lastSig && now - lastSent > 120) || now - lastSent > 2000) { street.send('pos', msg); lastSent = now; lastSig = sig; }
+  if (p.at !== 'street') msg.at = p.at;
+  const sig = p.at + ',' + msg.x + ',' + msg.y + ',' + msg.dir;
+  if (p.at !== lastAt || (sig !== lastSig && now - lastSent > 120) || now - lastSent > 2000) { street.send(p.at === 'street' ? 'pos' : 'at', msg); lastSent = now; lastSig = sig; lastAt = p.at; }
 }
 addEventListener('pagehide', () => { if (street && streetOut && game.meId) street.send('bye', { id: game.meId }); });
 
@@ -146,8 +190,9 @@ addEventListener('keyup', e => { if (MOVE[e.code]) game.keys[MOVE[e.code]] = fal
 addEventListener('blur', () => { game.keys = {}; });
 addEventListener('keydown', e => {
   if (e.target.closest && e.target.closest('input,textarea')) return;
-  if (MOVE[e.code] && Out.out.active) { game.keys[MOVE[e.code]] = true; e.preventDefault(); return; }
+  if (MOVE[e.code] && (Out.out.active || Gym.gym.active || Dun.dun.active)) { game.keys[MOVE[e.code]] = true; e.preventDefault(); return; }
   if (e.repeat) return;
+  if (Dun.dun.active && Dun.battleKey(e.code)) { e.preventDefault(); return; }
   if (e.code === 'Escape') { game.deselect(); TVR.close(); }
   if (e.code === 'KeyN') game.showNames = !game.showNames;
   if (e.code === 'KeyL') game.cycleLight();
@@ -170,7 +215,9 @@ function pick(wx, wy) {
 }
 cvs.addEventListener('mousemove', e => {
   const r = cvs.getBoundingClientRect(), w = toWorld(e.clientX - r.left, e.clientY - r.top);
-  if (Out.out.active) { game.hover = null; cvs.style.cursor = Out.overDoor(w.x, w.y) ? 'pointer' : 'default'; return; }
+  if (Dun.dun.active) { game.hover = null; cvs.style.cursor = Dun.overInteractive(w.x, w.y) ? 'pointer' : 'default'; return; }
+  if (Gym.gym.active) { game.hover = null; cvs.style.cursor = Gym.overDoor(w.x, w.y) || Gym.overStairs(w.x, w.y) || Gym.overBasement(w.x, w.y) ? 'pointer' : 'default'; return; }
+  if (Out.out.active) { game.hover = null; cvs.style.cursor = Out.overDoor(w.x, w.y) || Out.overGym(w.x, w.y) ? 'pointer' : 'default'; return; }
   game.hover = pick(w.x, w.y);
   cvs.style.cursor = game.hover || TVR.overTV(w.x, w.y) || overOfficeDoor(w.x, w.y) ? 'pointer' : 'default';
 });
@@ -178,6 +225,8 @@ cvs.addEventListener('mouseleave', () => { game.hover = null; });
 cvs.addEventListener('mousedown', e => {
   if (e.button !== 0) return;
   const r = cvs.getBoundingClientRect(), w = toWorld(e.clientX - r.left, e.clientY - r.top);
+  if (Dun.dun.active) { Dun.clickDun(w.x, w.y, e.clientX - r.left, e.clientY - r.top); return; }
+  if (Gym.gym.active) { Gym.clickGym(w.x, w.y); return; }
   if (Out.out.active) { Out.clickOutside(w.x, w.y); return; }
   const a = pick(w.x, w.y);
   if (a) game.select(a);
@@ -252,6 +301,14 @@ function drawParticles(t) {
 }
 
 /* ---------------- overlay (screen space) ---------------- */
+// name tags over colleagues seen in the street / gym / Resenha room (screen space)
+function remotePills(list) {
+  for (const r of list) {
+    if (r.alpha < 0.5) continue;
+    const who = game.actors.find(x => x.id === r.id), rs = toScreen(r.x, r.headY);
+    pill(rs.x, rs.y - 3, who ? who.short : r.id, 'rgba(138,180,255,.6)', STATUS[who ? who.status : 'break'].color);
+  }
+}
 function pill(x, y, text, color, dotColor) {
   ctx.font = '600 11px "Pixelify Sans", "Segoe UI", system-ui, sans-serif';
   const w = Math.ceil(ctx.measureText(text).width) + (dotColor ? 22 : 14), h = 17;
@@ -305,15 +362,19 @@ function frame(now) {
   if ((panelT -= dt) <= 0) { panelT = 1; S.counts = UI.refreshPanel(); }
 
   if (Out.out.active) Out.updateOutside(dt, game.keys);
+  if (Gym.gym.active) Gym.updateGym(dt, game.keys);
+  if (Dun.dun.active) Dun.updateDun(dt, game.keys);
   Out.tickRemotes(dt);
   syncStreet(now);
-  const outside = Out.out.active, BW = outside ? Out.OW : W, BH = outside ? Out.OH : H;
+  const inDun = Dun.dun.active, inGym = !inDun && Gym.gym.active, outside = !inDun && !inGym && Out.out.active;
+  const dsz = inDun ? Dun.size() : null;
+  const BW = inDun ? dsz.w : inGym ? Gym.GW : outside ? Out.OW : W, BH = inDun ? dsz.h : inGym ? Gym.GH : outside ? Out.OH : H;
 
-  // camera follows whoever is selected (or the walker, outside)
+  // camera follows whoever is selected (or the walker, outside / in the gym)
   if (game.selected?.mode === 'gone') game.deselect();
-  const p = outside ? Out.out.walker : game.selected;
-  const baseZ = outside ? h / Out.OH : p ? Math.max(fit * 1.3, 2) : fit * 0.98;
-  const zt = Math.max(outside ? baseZ * 0.8 : fit * 0.6, baseZ * game.userZoom);
+  const p = inDun ? Dun.dun.walker : inGym ? Gym.gym.walker : outside ? Out.out.walker : game.selected;
+  const baseZ = inDun || inGym ? Math.max(fit * 1.3, h / (11 * T)) : outside ? h / Out.OH : p ? Math.max(fit * 1.3, 2) : fit * 0.98;
+  const zt = Math.max(outside || inGym || inDun ? baseZ * 0.8 : fit * 0.6, baseZ * game.userZoom);
   const c = game.cam;
   c.z += (zt - c.z) * Math.min(1, dt * 4);
   let cx = p ? p.x : BW / 2, cy = p ? p.y - 24 : BH / 2;
@@ -328,15 +389,35 @@ function frame(now) {
   const k = dpr * c.z;
   ctx.setTransform(k, 0, 0, k, Math.round(dpr * (w / 2 - c.x * c.z)), Math.round(dpr * (h / 2 - c.y * c.z)));
   ctx.imageSmoothingEnabled = false;
+  if (inDun) {
+    const near = Dun.dun.scene.kind === 'hub' && !Dun.inBattle() ? Out.visibleOthers('hub', Dun.dun.walker.id) : [];
+    Dun.drawDun(ctx, t, near);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    remotePills(near);
+    const wk = Dun.dun.walker, s = toScreen(wk.headX, wk.headY);
+    const nh = Dun.npcHead(); if (nh) { const ns = toScreen(nh.x, nh.y); pill(ns.x, ns.y, Dun.npcName, 'rgba(255,61,127,.7)'); }
+    pill(s.x, s.y - 3, wk.a.short, '#ffd27a', STATUS[wk.a.status].color);
+    Dun.drawDunHud(ctx, w, h, t, toScreen);
+    TVR.place(toScreen, true);
+    requestAnimationFrame(frame);
+    return;
+  }
+  if (inGym) {
+    const near = Out.visibleOthers('gym' + Gym.gym.floor, Gym.gym.walker.id);
+    Gym.drawGym(ctx, t, near);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    remotePills(near);
+    const wk = Gym.gym.walker, s = toScreen(wk.headX, wk.headY);
+    if (wk.alpha > 0.5) pill(s.x, s.y - 3, wk.a.short, '#ffd27a', STATUS[wk.a.status].color);
+    TVR.place(toScreen, true);
+    requestAnimationFrame(frame);
+    return;
+  }
   if (outside) {
     Out.drawOutside(ctx, t, game.day);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const wk = Out.out.walker, s = toScreen(wk.headX, wk.headY);
-    for (const r of Out.visibleOthers()) {
-      if (r.alpha < 0.5) continue;
-      const who = game.actors.find(x => x.id === r.id), rs = toScreen(r.x, r.headY);
-      pill(rs.x, rs.y - 3, who ? who.short : r.id, 'rgba(138,180,255,.6)', STATUS[who ? who.status : 'break'].color);
-    }
+    remotePills(Out.visibleOthers());
     if (wk.alpha > 0.5) pill(s.x, s.y - 3, wk.a.short, '#ffd27a', STATUS[wk.a.status].color);
     TVR.place(toScreen, true);
     requestAnimationFrame(frame);

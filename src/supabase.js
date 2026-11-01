@@ -53,7 +53,9 @@ export async function tvSubscribe(onChange, onStatus) {
 }
 
 /* ---------- street multiplayer (supabase/office_street.sql) ----------
-   Private broadcast channel: only confirmed @engmr.com.br accounts can join or send. Nothing is stored. */
+   Private broadcast channel: only confirmed @engmr.com.br accounts can join or send. Nothing is stored.
+   'pos' = on the street (as always); 'at' = inside the Smart Fit / Resenha room (payload.at says where; older
+   clients don't listen to it, so they never draw indoor positions on the street); 'bye' = left. */
 export async function streetJoin(onMessage) {
   const sb = await client();
   const { data } = await sb.auth.getSession();
@@ -61,6 +63,7 @@ export async function streetJoin(onMessage) {
   sb.realtime.setAuth(data.session.access_token); // private channels are authorised with the user's token
   const ch = sb.channel('office-street', { config: { private: true, broadcast: { self: false } } });
   ch.on('broadcast', { event: 'pos' }, ({ payload }) => onMessage(payload))
+    .on('broadcast', { event: 'at' }, ({ payload }) => onMessage(payload))
     .on('broadcast', { event: 'bye' }, ({ payload }) => onMessage({ ...payload, bye: true }));
   await new Promise((resolve, reject) => ch.subscribe(st => {
     if (st === 'SUBSCRIBED') resolve();

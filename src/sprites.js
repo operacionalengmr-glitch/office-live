@@ -83,6 +83,49 @@ export async function loadSprites(ids) {
   }));
 }
 
+// Same drawing, other clothes: a new character made from an existing one by repainting its torso (between the
+// neck and the hips) in `rgb`, keeping the shading; skin and the dark outline are left alone. Used for enemies.
+// ref: brightness that maps to the plain colour (pass ~210 for a white shirt so its folds keep their shading)
+export function tinted(srcId, newId, rgb, ref = 0) {
+  const src = SPR[srcId];
+  if (!src || SPR[newId]) return;
+  const frames = {};
+  for (const pose of Object.keys(src.frames)) {
+    frames[pose] = {};
+    for (const dir of Object.keys(src.frames[pose])) {
+      const m = src.meta[dir];
+      frames[pose][dir] = src.frames[pose][dir].map(c => {
+        const o = canvas(c.width, c.height), g = o.getContext('2d');
+        g.drawImage(c, 0, 0);
+        const d = g.getImageData(0, 0, c.width, c.height), p = d.data;
+        for (let y = m.neck + 1; y < Math.min(c.height, m.hip + 2); y++) for (let x = 0; x < c.width; x++) {
+          const i = (y * c.width + x) * 4;
+          if (!p[i + 3]) continue;
+          const lum = (p[i] + p[i + 1] + p[i + 2]) / 3;
+          if (p[i] - p[i + 2] > 30 || lum < 18) continue;
+          const k = ref ? Math.min(1.3, lum / ref) : Math.min(1.25, 0.45 + lum / 120);
+          p[i] = Math.min(255, rgb[0] * k); p[i + 1] = Math.min(255, rgb[1] * k); p[i + 2] = Math.min(255, rgb[2] * k);
+        }
+        g.putImageData(d, 0, 0);
+        return o;
+      });
+    }
+  }
+  SPR[newId] = { frames, meta: src.meta };
+}
+
+// A character drawn from a single front pose (an NPC that stands still, e.g. the Resenha's host):
+// every direction shows that pose, with the usual breathing frame and a leg-lift walk.
+export async function loadStill(id, src) {
+  const img = await loadImg(src);
+  const c = canvas(CW, CH), g = c.getContext('2d', { willReadFrequently: true });
+  g.drawImage(img, 0, 0);
+  const d = g.getImageData(0, 0, CW, CH), m = measure(d);
+  const still = [toCanvas(d), toCanvas(breath(d, m))], dirs = { down: still, left: still, right: still, up: still };
+  const steps = [toCanvas(legLift(d, m, true)), still[0], toCanvas(legLift(d, m, false)), still[0]], walk = { down: steps, left: steps, right: steps, up: steps };
+  SPR[id] = { frames: { stand: dirs, walk, sit: dirs }, meta: { down: m, left: m, right: m, up: m } };
+}
+
 export function frame(id, pose, dir, i) {
   const f = SPR[id].frames[pose][dir], n = f.length;
   return f[((i % n) + n) % n]; // i can be negative (rAF timestamps may predate the start time)
