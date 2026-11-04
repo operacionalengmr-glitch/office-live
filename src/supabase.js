@@ -25,6 +25,19 @@ export async function signIn(email, password) {
 
 export const signOut = async () => (await client()).auth.signOut();
 
+// Auto-login by IP: the local server (tools/serve.py) answers /autologin with session tokens only
+// for the IPs listed in its git-ignored autologin.json. Anywhere else (GitHub Pages, other IPs) it 404s
+// and this returns false, so the normal "Conectar ao ponto" form is used.
+export async function autoLogin() {
+  let res;
+  try { res = await fetch('autologin', { cache: 'no-store' }); } catch { return false; }
+  if (!res.ok) return false;
+  const { access_token, refresh_token } = await res.json();
+  const { error } = await (await client()).auth.setSession({ access_token, refresh_token });
+  if (error) throw error;
+  return true;
+}
+
 // the signed-in account's character id (public.office_me, supabase/office_me.sql), or null
 export async function whoAmI() {
   const { data, error } = await (await client()).rpc('office_me');
