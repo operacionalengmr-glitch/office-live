@@ -42,15 +42,6 @@ timer rodando = Trabalhando, parou há menos de 90 min hoje = Pausa, resto = For
 para os e-mails não ficarem no código público. Só contas `@engmr.com.br` confirmadas recebem dados.
 Sem login, o jogo roda em modo demo.
 
-**Login automático por IP** (só pelo `run.bat` / `tools/serve.py`, não no GitHub Pages): crie um `autologin.json` na raiz
-(está no `.gitignore`, nunca suba ele):
-
-```json
-{ "ips": ["192.168.0.8", "127.0.0.1", "::1"], "email": "voce@engmr.com.br", "password": "..." }
-```
-
-Quem abrir o jogo a partir de um desses IPs entra no ponto sozinho. A senha fica só no servidor; o navegador recebe apenas a sessão.
-
 ## TV do escritório (YouTube)
 
 A TV ao lado dos arquivos toca vídeos do YouTube para todo mundo que está com o jogo aberto, no mesmo ponto do vídeo.

@@ -515,8 +515,6 @@ async function boot() {
   world = buildWorldArt();
   // signed in already? start from the real statuses so nobody walks in/out on load
   let presence = null;
-  // not signed in yet? the local server may sign this IP in automatically (tools/serve.py, autologin.json)
-  try { if (!(await Live.currentUser())) await Live.autoLogin(); } catch (err) { console.warn('autologin', err); }
   try { if (await Live.currentUser()) presence = await Live.fetchPresence(); } catch (err) { console.warn('presence', err); }
   const byId = Object.fromEntries((presence || []).map(r => [r.id, r]));
   game.actors = TEAM.map(d => {
