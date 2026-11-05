@@ -70,6 +70,7 @@ async function act(fn, args, done) {
 // bring the local player in line with the shared state; runs on every change and every few seconds
 function sync() {
   tv.on = !!st?.video_id;
+  tv.playing = tv.on && !paused(); // the office reacts to the TV while something plays (main.js)
   if (tv.on && thumbId !== st.video_id) {
     const id = thumbId = st.video_id, im = new Image();
     tv.thumb = null; im.onload = () => { if (thumbId === id) tv.thumb = im; };

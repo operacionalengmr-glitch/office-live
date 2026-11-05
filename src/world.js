@@ -118,6 +118,7 @@ export const SPOTS = {
   sink: { kind: 'sink', tx: 31, ty: 3, face: 'up', label: 'Lavar as mãos', icon: '🫧' },
 };
 for (const s of Object.values(SPOTS)) { s.x = (s.tx + 0.5) * T; s.y = (s.ty + 0.6) * T; }
+SPOTS.coffee.x = 9 * T + 12; // stand beside the machine so the cup filling up stays visible
 
 export const EXIT = { tx: 3, ty: 2, x: 4 * T, y: 2 * T + 14 };
 export const DOOR = { x0: 3 * T, x1: 5 * T };

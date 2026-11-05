@@ -17,7 +17,9 @@ kbd { font: 600 10px var(--mono); color: var(--text); background: var(--panel2);
 #hud > * { pointer-events: auto; }
 .brand { display: flex; gap: 10px; align-items: center; background: rgba(10, 17, 32, .82); border: 1px solid var(--line); border-radius: 10px; padding: 7px 12px 7px 8px; backdrop-filter: blur(6px); }
 .brand b { font: 700 16px var(--pixel); letter-spacing: .5px; display: block; color: #eef4ff; }
-.brand small { color: var(--dim); font-size: 11px; text-transform: capitalize; }
+.brand small { color: var(--dim); font-size: 11px; text-transform: capitalize; display: block; }
+#weather { text-transform: none; color: #b9c8e0; }
+#weather:empty { display: none; }
 .logo { font: 700 13px var(--pixel); background: linear-gradient(135deg, #2d4f95, #5d8fd6); color: #fff; border-radius: 7px; padding: 7px 8px; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .25); }
 .logo.big { font-size: 26px; padding: 12px 16px; border-radius: 12px; }
 .hud-btns { display: flex; gap: 6px; }

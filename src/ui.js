@@ -1,5 +1,6 @@
 ﻿// DOM side panel (mock timesheet), character card, toasts and the loading screen.
 import { STATUS } from './data.js';
+import { weather } from './weather.js';
 import { portrait, frame, CW } from './sprites.js';
 
 const $ = s => document.querySelector(s);
@@ -76,6 +77,7 @@ export function refreshPanel() {
   $('#counts').innerHTML = Object.entries(counts).map(([k, n]) => `<span><i style="background:${STATUS[k].color}"></i>${n} ${STATUS[k].label.toLowerCase()}</span>`).join('');
   const d = new Date();
   $('#clock').textContent = d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'short' }) + ' · ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  $('#weather').textContent = weather.label; // real weather in João Pessoa (weather.js)
   const lb = $('#liveBtn');
   lb.textContent = game.live ? '🟢 Ao vivo · sair' : '🔌 Conectar ao ponto';
   lb.classList.toggle('on', game.live);

@@ -2,7 +2,7 @@
 import { TEAM, STATUS } from './data.js';
 import { T, W, H, DOOR } from './world.js';
 import { loadSprites } from './sprites.js';
-import { buildWorldArt, OBJECTS, LIGHTS, drawScreen, VOID } from './art.js';
+import { buildWorldArt, buildShafts, OBJECTS, LIGHTS, drawScreen, VOID } from './art.js';
 import { Actor } from './actors.js';
 import * as UI from './ui.js';
 import * as Live from './supabase.js';
@@ -10,6 +10,8 @@ import * as TVR from './tv.js';
 import * as Out from './outside.js';
 import * as Gym from './smartfit.js';
 import * as Dun from './dungeon.js';
+import * as Life from './life.js';
+import { weather, startWeather } from './weather.js';
 
 const cvs = document.getElementById('game'), ctx = cvs.getContext('2d');
 const stage = document.getElementById('stage');
@@ -173,6 +175,7 @@ addEventListener('pagehide', () => { if (street && streetOut && game.meId) stree
 const deskOwner = {};
 const S = { // read by animated art
   get day() { return game.day; }, get doorOpen() { return game.doorOpen; }, get brewing() { return game.brewing > 0; },
+  get brewP() { return game.brewTotal ? 1 - game.brewing / game.brewTotal : 0; },
   get actors() { return game.actors; }, get tv() { return TVR.tv; }, counts: { working: 0, break: 0, offline: 0 },
   seatTaken: s => !!s.occupant,
   deskState(d) {
@@ -246,12 +249,23 @@ function resize() {
 new ResizeObserver(resize).observe(stage);
 
 /* ---------------- lighting ---------------- */
+// 0 = night, 0.45 = "fim de tarde", 1 = day. Late afternoon light from 16:00, dark after 18:30.
+const hourNow = () => { const d = new Date(); return d.getHours() + d.getMinutes() / 60; };
 function autoDay() {
-  const d = new Date(), h = d.getHours() + d.getMinutes() / 60;
-  if (h < 6 || h >= 19.5) return 0;
-  if (h < 8) return (h - 6) / 2;
-  if (h >= 17) return 1 - (h - 17) / 2.5;
-  return 1;
+  const h = hourNow();
+  if (h < 5.5 || h >= 18.5) return 0;
+  if (h < 7) return (h - 5.5) / 1.5;
+  if (h < 15) return 1;
+  if (h < 16) return 1 - 0.55 * (h - 15);
+  if (h < 17.5) return 0.45;
+  return 0.45 * (1 - (h - 17.5));
+}
+// sun shafts follow the clock (rebuilt a few times an hour) and fade under clouds
+let shaftKey = -1;
+function shafts() {
+  const p = Math.min(1, Math.max(0, (hourNow() - 6) / 12)), k = Math.round(p * 60);
+  if (k !== shaftKey) { shaftKey = k; world.shafts = buildShafts(p); }
+  return world.shafts;
 }
 const [dark, dg] = (() => { const c = document.createElement('canvas'); c.width = W; c.height = H; return [c, c.getContext('2d')]; })();
 function drawNight(present) {
@@ -262,8 +276,16 @@ function drawNight(present) {
   dg.fillStyle = `rgba(6,10,28,${0.68 * night})`; dg.fillRect(0, 0, W, H);
   dg.globalCompositeOperation = 'destination-out';
   const lit = [];
+  let ci = 0;
   for (const L of LIGHTS) {
-    const on = L.when === 'always' || (L.when === 'present' && present) || (L.when === 'desk' && S.deskState(L.desk) !== 'off') || (L.when === 'tv' && TVR.tv.on);
+    let on = L.when === 'always' || (L.when === 'present' && present) || (L.when === 'desk' && S.deskState(L.desk) !== 'off') || (L.when === 'tv' && TVR.tv.on);
+    if (L.ceiling) { // ceiling lights switch on one by one as it gets dark, with a fluorescent flicker
+      const want = on && night > 0.1 + 0.04 * ci++;
+      if (want && !L.lit) { L.lit = true; L.flick = 0.5 + Math.random() * 0.4; }
+      if (!want) L.lit = false;
+      L.flick = Math.max(0, (L.flick || 0) - 1 / 60);
+      on = L.lit && !(L.flick > 0 && Math.random() < 0.5);
+    }
     if (!on) continue;
     lit.push(L);
     const gr = dg.createRadialGradient(L.x, L.y, 0, L.x, L.y, L.r);
@@ -283,8 +305,9 @@ function drawNight(present) {
 /* ---------------- particles ---------------- */
 const motes = Array.from({ length: 40 }, () => ({ x: 24 * T + Math.random() * 9 * T, y: 7 * T + Math.random() * 16 * T, p: Math.random() * 7 }));
 function updateParticles(dt, t) {
+  if (game.brewing > 0 && Math.random() < dt * 2.5) game.particles.push({ x: 10 * T + 16 + (Math.random() - 0.5) * 6, y: 2 * T - 8, vx: (Math.random() - 0.5) * 4, vy: -7, life: 1.8, max: 1.8, kind: 'puff' });
   if (game.brewing > 0 && Math.random() < dt * 10) game.particles.push({ x: 10 * T + 16 + (Math.random() - 0.5) * 4, y: 2 * T - 6, vx: (Math.random() - 0.5) * 3, vy: -10, life: 1.4, max: 1.4, kind: 'steam' });
-  for (const p of game.particles) { p.life -= dt; p.x += p.vx * dt + (p.kind === 'steam' ? Math.sin(t * 3 + p.y) * 0.15 : 0); p.y += p.vy * dt; }
+  for (const p of game.particles) { p.life -= dt; p.x += p.vx * dt + (p.kind === 'steam' || p.kind === 'puff' ? Math.sin(t * 3 + p.y) * 0.15 : 0); p.y += p.vy * dt; }
   game.particles = game.particles.filter(p => p.life > 0);
 }
 function drawParticles(t) {
@@ -294,8 +317,8 @@ function drawParticles(t) {
   }
   for (const p of game.particles) {
     const k = p.life / p.max;
-    ctx.fillStyle = p.kind === 'steam' ? `rgba(255,255,255,${0.5 * k})` : `rgba(190,180,165,${0.6 * k})`;
-    const s = p.kind === 'steam' ? (k > 0.5 ? 1 : 2) : 2;
+    ctx.fillStyle = p.kind === 'steam' || p.kind === 'puff' ? `rgba(255,255,255,${(p.kind === 'puff' ? 0.35 : 0.5) * k})` : `rgba(190,180,165,${0.6 * k})`;
+    const s = p.kind === 'puff' ? Math.round(2 + (1 - k) * 4) : p.kind === 'steam' ? (k > 0.5 ? 1 : 2) : 2;
     ctx.fillRect(Math.round(p.x), Math.round(p.y), s, s);
   }
 }
@@ -348,11 +371,12 @@ function drawOverlay(t) {
 let last = performance.now(), panelT = 0;
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  const t = now / 1000;
+  const t = game.t = now / 1000;
   const { w, h, dpr, fit } = game.view;
 
   // simulation
   for (const a of game.actors) a.update(dt, game);
+  Life.updateLife(dt, t, game, TVR.tv);
   game.brewing = Math.max(0, game.brewing - dt); game.printing = Math.max(0, game.printing - dt);
   const target = { auto: autoDay(), day: 1, dusk: 0.45, night: 0 }[game.lightMode];
   game.day += (target - game.day) * Math.min(1, dt * 2);
@@ -425,7 +449,8 @@ function frame(now) {
     return;
   }
   ctx.drawImage(world.floor, 0, 0);
-  if (game.day > 0.05) { ctx.globalAlpha = game.day * (0.75 + 0.25 * Math.sin(t * 0.4)); ctx.drawImage(world.shafts, 0, 0); ctx.globalAlpha = 1; }
+  const sun = game.day * (weather.ready ? weather.sun : 1);
+  if (sun > 0.05) { ctx.globalAlpha = sun * (0.75 + 0.25 * Math.sin(t * 0.4)); ctx.drawImage(shafts(), 0, 0); ctx.globalAlpha = 1; }
 
   if (p) { // selection ring on the floor
     const ry = p.mode === 'sit' ? p.seat.standY : p.y;
@@ -435,6 +460,7 @@ function frame(now) {
 
   const items = OBJECTS.map(o => ({ s: o.sortY, o }));
   for (const a of game.actors) if (a.mode !== 'gone' && !Out.isOutside(a.id)) items.push({ s: a.sortY, a });
+  items.push({ s: Life.vacuumItem.sortY, o: Life.vacuumItem });
   items.sort((A, B) => A.s - B.s);
   for (const it of items) {
     if (it.o) {
@@ -442,12 +468,14 @@ function frame(now) {
       const d = it.o.desk;
       if (d && d.screens.length) {
         const st = S.deskState(d), who = d.seatRef.occupant || deskOwner[d.id];
-        d.screens.forEach((sc, i) => drawScreen(ctx, sc, who ? who.screens[i] : 'sheet', t, d.tx + i * 3, st));
+        d.screens.forEach((sc, i) => { drawScreen(ctx, sc, who ? who.screens[i] : 'sheet', t, d.tx + i * 3, st); Life.drawScreenTint(ctx, sc, who, t, st); });
       }
+      if (d) Life.drawDeskCups(ctx, d, deskOwner[d.id]);
     } else {
       const a = it.a;
       const ring = a === game.selected ? '#ffd27a' : a === game.hover ? '#ffffff' : null;
       a.draw(ctx, t, ring);
+      Life.drawActorExtras(ctx, a, t);
     }
   }
   drawParticles(t);
@@ -458,6 +486,7 @@ function frame(now) {
   // screen-space overlay
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawOverlay(t);
+  Life.drawLifeOverlay(ctx, t, toScreen, game, game.cam.z);
   TVR.place(toScreen);
   requestAnimationFrame(frame);
 }
@@ -468,10 +497,18 @@ function applyPresence(rows) {
   const byId = Object.fromEntries(rows.map(r => [r.id, r]));
   for (const a of game.actors) {
     const row = byId[a.id], st = row ? row.status : 'offline';
+    const was = a.status;
     if (game.setStatus(a.id, st) && row?.since) a.since = row.since.getTime();
-    a.project = row?.project || null;
+    game.setProject(a, row?.project || null, was);
   }
 }
+// a running timer moved to another project: swoosh over the head + the monitors flash the new colour
+game.setProject = (a, proj, was = a.status) => {
+  const old = a.project;
+  a.project = proj;
+  if (was === 'working' && a.status === 'working' && proj && (old?.name !== proj.name || old?.client !== proj.client))
+    Life.projectSwitch(a, old, proj, game.t || 0);
+};
 async function poll() {
   try { applyPresence(await Live.fetchPresence()); }
   catch (err) { console.warn('presence', err); UI.toast('Não consegui ler o ponto agora; tento de novo em instantes', '#e07a5f'); }
@@ -533,6 +570,7 @@ async function boot() {
   UI.runIntro(game.actors);
   requestAnimationFrame(frame);
   TVR.initTV();
+  startWeather();
 }
 boot();
 
@@ -546,5 +584,6 @@ window.OfficeLive = {
   team: () => game.actors.map(a => ({ id: a.id, name: a.name, status: a.status, since: a.since })),
   select: id => { const a = game.actors.find(x => x.id === id); if (a) game.select(a); },
   deselect: () => game.deselect(),
+  setProject: (id, project) => { const a = game.actors.find(x => x.id === id); if (a) game.setProject(a, project); }, // { name, color, client?, task? }
   on: (ev, cb) => { (game.listeners[ev] = game.listeners[ev] || []).push(cb); },
 };

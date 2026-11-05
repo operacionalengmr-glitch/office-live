@@ -1,6 +1,7 @@
 // Procedural pixel art for the office: floor, 3/4 walls, furniture, animated screens and lights.
 // Everything static is painted once into offscreen canvases; objects are y-sorted with the people.
 import { T, MW, MH, W, H, floorT, wallT, DESKS, PROPS, SEATS, rng } from './world.js';
+import { drawWindowWeather, weather } from './weather.js';
 
 export const VOID = '#0a1120';
 const OUT = '#1c1f27';
@@ -155,19 +156,20 @@ export function buildFloor() {
 }
 
 // sun shafts from the east curtain wall and the north windows (drawn over the floor in daytime)
-export function buildShafts() {
+export function buildShafts(p = 0.5) {
   const [c, g] = cv(W, H);
   const shaft = (pts, x0, y0, x1, y1, a) => {
     const gr = g.createLinearGradient(x0, y0, x1, y1); gr.addColorStop(0, `rgba(255,236,190,${a})`); gr.addColorStop(1, 'rgba(255,236,190,0)');
     g.fillStyle = gr; g.beginPath(); g.moveTo(...pts[0]); for (const p of pts.slice(1)) g.lineTo(...p); g.fill();
   };
   for (let y = 7; y < 22; y += 2) {
-    const y0 = y * T + 6, y1 = y0 + 2 * T - 14, L = 7 * T;
-    shaft([[33 * T, y0], [33 * T, y1], [33 * T - L, y1 + L * 0.4], [33 * T - L, y0 + L * 0.4]], 33 * T, 0, 33 * T - L, 0, 0.16);
+    // morning sun comes in low through the east glass (long shafts), by the afternoon it's above the roof
+    const y0 = y * T + 6, y1 = y0 + 2 * T - 14, L = T * (1.5 + 7 * (1 - p)), dip = 0.15 + 0.5 * p;
+    shaft([[33 * T, y0], [33 * T, y1], [33 * T - L, y1 + L * dip], [33 * T - L, y0 + L * dip]], 33 * T, 0, 33 * T - L, 0, 0.05 + 0.13 * (1 - p));
   }
   for (const [x0, x1] of [[6 * T + 6, 8 * T + 26], [21 * T + 6, 22 * T + 26]]) {
-    const L = 3 * T;
-    shaft([[x0, 2 * T], [x1, 2 * T], [x1 + L * 0.3, 2 * T + L], [x0 + L * 0.3, 2 * T + L]], 0, 2 * T, 0, 2 * T + L, 0.18);
+    const L = T * (2.2 + 1.6 * Math.sin(Math.PI * p)), lean = 0.9 - 1.8 * p; // the patch slides across the floor
+    shaft([[x0, 2 * T], [x1, 2 * T], [x1 + L * lean, 2 * T + L], [x0 + L * lean, 2 * T + L]], 0, 2 * T, 0, 2 * T + L, 0.18);
   }
   // keep light out of walls/void
   g.globalCompositeOperation = 'destination-out';
@@ -219,11 +221,11 @@ function buildWalls() {
     // kitchen: framed print + menu board
     R(g, 24 * T + 4, 16, 22, 26, '#2a2f38'); R(g, 24 * T + 6, 18, 18, 22, '#f2e7d0'); pe(g, 24 * T + 15, 27, 5, 5, '#e07a5f'); R(g, 24 * T + 8, 34, 14, 3, '#3d8a6a');
   }, (g, t, S) => {
-    drawWindowView(g, 6 * T + 6, 14, 2 * T + 20, 34, S.day, 3); windowGlass(g, 6 * T + 6, 14, 2 * T + 20, 34);
-    drawWindowView(g, 21 * T + 6, 14, 2 * T + 20, 34, S.day, 9); windowGlass(g, 21 * T + 6, 14, 2 * T + 20, 34);
+    drawWindowView(g, 6 * T + 6, 14, 2 * T + 20, 34, S.day, 3); drawWindowWeather(g, 6 * T + 6, 14, 2 * T + 20, 34, t, S.day, 3); windowGlass(g, 6 * T + 6, 14, 2 * T + 20, 34);
+    drawWindowView(g, 21 * T + 6, 14, 2 * T + 20, 34, S.day, 9); drawWindowWeather(g, 21 * T + 6, 14, 2 * T + 20, 34, t, S.day, 9); windowGlass(g, 21 * T + 6, 14, 2 * T + 20, 34);
     // sliding glass doors
     const o = S.doorOpen * 28, x0 = 3 * T, y0 = 12, h = 2 * T - 12;
-    drawWindowView(g, x0, y0, 2 * T, h, S.day, 21);
+    drawWindowView(g, x0, y0, 2 * T, h, S.day, 21); drawWindowWeather(g, x0, y0, 2 * T, h, t, S.day, 21);
     for (const [px, dir] of [[x0 - o, 1], [x0 + T + o, -1]]) {
       g.save(); g.beginPath(); g.rect(x0, y0, 2 * T, h); g.clip();
       R(g, px, y0, T, h, 'rgba(160,200,225,.55)'); R(g, px, y0, T, 2, '#9aa4b1'); R(g, px, y0, 2, h, '#9aa4b1'); R(g, px + T - 2, y0, 2, h, '#9aa4b1');
@@ -314,6 +316,8 @@ function buildWalls() {
     g.fillRect(33 * T + 3, 7 * T - 22, 11, 16 * T + 22);
     for (let y = 7 * T - 22; y < 23 * T; y += 2 * T) R(g, 33 * T + 2, y, 13, 2, '#5b6370');
     R(g, 33 * T + 5, 7 * T - 22, 1, 16 * T + 22, 'rgba(255,255,255,.5)');
+    if (weather.ready && weather.kind !== 'clear') { g.fillStyle = 'rgba(120,130,145,.35)'; g.fillRect(33 * T + 3, 7 * T - 22, 11, 16 * T + 22); }
+    if (weather.rain > 0) for (let i = 0; i < 40 * weather.rain; i++) R(g, 33 * T + 4 + (i * 7) % 10, 7 * T - 22 + ((t * 70 + i * 97) % (16 * T + 22)), 1, 5, 'rgba(225,235,248,.6)');
   });
   addObj(0, 23 * T, W, 16, H + 3, g => { R(g, 0, 0, W, 16, WALL.capLo); R(g, 0, 1, W, 12, WALL.cap); R(g, 0, 1, W, 1, WALL.capHi); });
 }
@@ -564,7 +568,14 @@ function buildProp(p) {
       R(g, 200, 26, 44, 24, OUT); R(g, 201, 27, 42, 22, '#e1e4e8'); R(g, 204, 30, 28, 16, '#1b1f27'); R(g, 205, 31, 10, 2, '#3a4150'); R(g, 235, 31, 5, 2, '#4fd18b'); R(g, 235, 36, 5, 8, '#b8bec6');
       // herbs (tile 18)
       for (const hx of [292, 304]) { R(g, hx, 40, 9, 8, '#b5643c'); pe(g, hx + 4, 37, 5, 4, LEAF[3]); pe(g, hx + 3, 35, 2, 2, LEAF[4]); }
-    }, (g, t, S) => { R(g, x + 39, y - 40 + 17, 2, 1, (t * 2 | 0) % 2 || !S.brewing ? '#4fd18b' : '#ff5a4a'); });
+    }, (g, t, S) => {
+      R(g, x + 39, y - 40 + 17, 2, 1, (t * 2 | 0) % 2 || !S.brewing ? '#4fd18b' : '#ff5a4a');
+      if (S.brewing) { // coffee pours from the spout and the cup fills up
+        const p = S.brewP, lvl = Math.round(5 * p);
+        if (p < 0.92) for (let k = 0; k < 5; k++) R(g, x + 47, y - 40 + 33 + k, 2, 1, k % 2 ? '#6b3e22' : '#4a2a16');
+        R(g, x + 45, y - 40 + 44 - lvl, 6, lvl, '#5a3219'); if (lvl) R(g, x + 45, y - 40 + 44 - lvl, 6, 1, '#a8704a');
+      }
+    });
       LIGHTS.push({ x: x + 5 * T, y: y + 4, r: 120, col: '255,214,140', a: 0.5, when: 'present' }); break;
     case 'fridge': addObj(x, y - 46, w, T + 46, sortY, g => {
       shadow(g, 2, 66, 60, 10);
@@ -672,7 +683,7 @@ function buildProp(p) {
 /* ---------------- lights for the night overlay ---------------- */
 function buildLights() {
   for (const [x, y] of [[16.5, 10.5], [22.5, 10.5], [28.5, 10.5], [16.5, 17.5], [22.5, 17.5], [28.5, 17.5], [12, 10], [12, 18], [5, 11], [5, 19.5], [4, 3.5], [29, 3.5], [21, 4]])
-    LIGHTS.push({ x: x * T, y: y * T, r: 150, col: '255,236,200', a: 0.85, when: 'present' });
+    LIGHTS.push({ x: x * T, y: y * T, r: 150, col: '255,236,200', a: 0.85, when: 'present', ceiling: true });
   for (const d of DESKS) LIGHTS.push({ x: d.glow.x, y: d.glow.y, r: 64, col: '150,200,255', a: 0.7, when: 'desk', desk: d });
 }
 

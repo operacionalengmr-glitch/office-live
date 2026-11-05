@@ -109,7 +109,7 @@ export class Actor {
       } else if (s.type === 'wait') {
         this.waitT = s.t; this.dir = s.spot.face; this.mode = 'stand';
         this.setEmote(s.spot.icon, s.t);
-        if (s.spot.kind === 'coffee') game.brewing = s.t;
+        if (s.spot.kind === 'coffee') game.brewing = game.brewTotal = s.t;
         if (s.spot.kind === 'printer') game.printing = s.t;
       } else if (s.type === 'appear') {
         this.x = EXIT.x; this.y = EXIT.y; this.mode = 'stand'; this.dir = 'down'; this.alpha = 0;
@@ -137,7 +137,7 @@ export class Actor {
   update(dt, game) {
     if (this.emote && performance.now() > this.emote.until) this.emote = null;
     if (this.status === 'working' && this.seat === this.ownSeat) { this.errandIn -= dt; this.hoursToday += dt / 3600; }
-    if (this.status === 'break' && this.seat?.kind === 'kitchen' && Math.random() < dt / 25) this.setEmote(this.carry === 'snack' ? '🍫' : '☕', 2);
+    if (this.status === 'break' && this.seat?.kind === 'kitchen' && !this.lazy && Math.random() < dt / 25) this.setEmote(this.carry === 'snack' ? '🍫' : '☕', 2);
     if (this.carry && this.status === 'working' && this.seat === this.ownSeat && Math.random() < dt / 120) this.carry = null;
 
     if (this.controlled) {
@@ -196,12 +196,13 @@ export class Actor {
     g.globalAlpha = this.alpha;
     const breathI = Math.floor(t * 1.4 + this.phase) % 2;
     if (this.mode === 'sit') {
-      const s = this.seat, m = SPR[this.id].meta[s.face], h = this.sitH();
-      const typing = this.status === 'working' && s === this.ownSeat && ((t + this.phase) % 5) < 3;
-      const dy = typing ? Math.floor(t * 7 + this.phase) % 2 : 0;
-      const fr = frame(this.id, 'sit', s.face, breathI);
+      // look: a glance to the side (life.js: the TV); bodyDx/bodyDy: stretching, nodding, dozing
+      const s = this.seat, look = this.look || s.face, m = SPR[this.id].meta[look], h = Math.round(m.h * 0.6);
+      const typing = this.status === 'working' && s === this.ownSeat && !this.act && ((t + this.phase) % 5) < 3;
+      const dy = (typing ? Math.floor(t * 7 + this.phase) % 2 : 0) + (this.bodyDy || 0);
+      const fr = frame(this.id, 'sit', look, breathI);
       drawChair(g, s, 'base');
-      const dx = Math.round(s.x - CW / 2), y0 = s.hipY - h + dy;
+      const dx = Math.round(s.x - CW / 2) + (this.bodyDx || 0), y0 = s.hipY - h + dy;
       if (ring) g.drawImage(outline(fr, ring), 0, m.top, CW + 2, h + 1, dx - 1, y0 - 1, CW + 2, h + 1);
       g.drawImage(fr, 0, m.top, CW, h, dx, y0, CW, h);
       drawChair(g, s, 'back');
@@ -210,7 +211,7 @@ export class Actor {
       const fi = pose === 'walk' ? Math.floor(this.animT) : breathI;
       const fr = frame(this.id, pose, this.dir, fi);
       g.fillStyle = 'rgba(8,12,24,.28)'; g.beginPath(); g.ellipse(this.x, this.y - 1, 10, 3.5, 0, 0, Math.PI * 2); g.fill();
-      const dx = Math.round(this.x - CW / 2), dy = Math.round(this.y - FOOT);
+      const dx = Math.round(this.x - CW / 2) + (this.bodyDx || 0), dy = Math.round(this.y - FOOT) + (this.bodyDy || 0);
       if (ring) g.drawImage(outline(fr, ring), dx - 1, dy - 1);
       g.drawImage(fr, dx, dy);
     }
