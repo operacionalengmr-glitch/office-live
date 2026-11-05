@@ -484,8 +484,8 @@ function startLive() {
 }
 const findMe = () => Live.whoAmI().then(id => { game.meId = id; }, err => { game.meId = null; console.warn('office_me', err); });
 game.connect = async (email, password) => {
-  await Live.signIn(email, password);
-  findMe();
+  if (email) { await Live.signIn(email, password); findMe(); }
+  else { await Live.pinSignIn(password); game.meId = null; } // office TV shortcut: read-only statuses
   startLive();
   await poll();
   TVR.refresh();
@@ -515,7 +515,7 @@ async function boot() {
   world = buildWorldArt();
   // signed in already? start from the real statuses so nobody walks in/out on load
   let presence = null;
-  try { if (await Live.currentUser()) presence = await Live.fetchPresence(); } catch (err) { console.warn('presence', err); }
+  try { if (Live.pinMode() || await Live.currentUser()) presence = await Live.fetchPresence(); } catch (err) { console.warn('presence', err); }
   const byId = Object.fromEntries((presence || []).map(r => [r.id, r]));
   game.actors = TEAM.map(d => {
     const row = byId[d.id];
@@ -528,7 +528,7 @@ async function boot() {
   resize();
   game.cam.z = game.view.fit * 0.98;
   UI.initUI(game);
-  if (presence) { startLive(); findMe(); }
+  if (presence) { startLive(); if (!Live.pinMode()) findMe(); }
   S.counts = UI.refreshPanel();
   UI.runIntro(game.actors);
   requestAnimationFrame(frame);

@@ -20,10 +20,32 @@ export async function currentUser() {
 export async function signIn(email, password) {
   const { data, error } = await (await client()).auth.signInWithPassword({ email, password });
   if (error) throw error;
+  clearPin();
   return data.user;
 }
 
-export const signOut = async () => (await client()).auth.signOut();
+export const signOut = async () => { clearPin(); await (await client()).auth.signOut(); };
+
+/* ---------- office TV shortcut (supabase/office_pin.sql) ----------
+   Empty e-mail + PIN: Supabase checks the PIN against a private hash and returns the live statuses (read-only,
+   no session, so no TV control or street). The PIN stays in this browser so the TV is still live after a reload. */
+const PIN_KEY = 'office-pin';
+let pin = null;
+try { pin = localStorage.getItem(PIN_KEY); } catch {}
+const clearPin = () => { pin = null; try { localStorage.removeItem(PIN_KEY); } catch {} };
+export const pinMode = () => !!pin;
+
+async function presenceByPin(p) {
+  const { data, error } = await (await client()).rpc('office_presence_pin', { pin: p });
+  if (error) throw error;
+  if (data == null) throw new Error('Invalid login credentials');
+  return data;
+}
+export async function pinSignIn(p) {
+  await presenceByPin(p); // throws when the PIN is wrong
+  await (await client()).auth.signOut(); // never mix a PIN with someone's real session
+  pin = p; try { localStorage.setItem(PIN_KEY, p); } catch {}
+}
 
 // the signed-in account's character id (public.office_me, supabase/office_me.sql), or null
 export async function whoAmI() {
@@ -78,8 +100,15 @@ export async function streetJoin(onMessage) {
 // -> [{ id (game character), status: 'working'|'break'|'offline', since: Date|null, project: { name, client, color, task }|null }]
 // project/task come from the running timer only (task = the timer's description).
 export async function fetchPresence() {
-  const { data, error } = await (await client()).rpc('office_presence');
-  if (error) throw error;
+  let data;
+  if (pin) {
+    try { data = await presenceByPin(pin); }
+    catch (err) { if (/invalid login/i.test(err.message || '')) clearPin(); throw err; } // PIN changed in Supabase
+  } else {
+    const res = await (await client()).rpc('office_presence');
+    if (res.error) throw res.error;
+    data = res.data;
+  }
   return data.map(r => ({
     id: r.game_id, status: r.status, since: r.since ? new Date(r.since) : null,
     project: r.project_name || r.task

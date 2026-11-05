@@ -42,6 +42,9 @@ timer rodando = Trabalhando, parou há menos de 90 min hoje = Pausa, resto = For
 para os e-mails não ficarem no código público. Só contas `@engmr.com.br` confirmadas recebem dados.
 Sem login, o jogo roda em modo demo.
 
+Atalho para a TV do escritório: deixe o e-mail vazio e use o PIN como senha. O PIN fica só como hash no Supabase
+(`supabase/office_pin.sql`) e liga apenas os status ao vivo (sem controle da TV e sem rua).
+
 ## TV do escritório (YouTube)
 
 A TV ao lado dos arquivos toca vídeos do YouTube para todo mundo que está com o jogo aberto, no mesmo ponto do vídeo.
