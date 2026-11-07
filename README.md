@@ -57,15 +57,17 @@ antes disso a TV toca sem som e liga o som no primeiro clique. Vídeos que o don
 
 ## Esfera (chat com IA)
 
-A esfera de cristal na bancada da cozinha (entre a pia e as frutas) abre um chat com a IA do Google (Gemini). Só funciona
+A esfera de cristal na bancada da cozinha (entre a pia e as frutas) abre um chat com IA (Nemotron 3 Ultra, da NVIDIA). Só funciona
 logado com o e-mail do ponto (`@engmr.com.br`). O navegador chama a Edge Function `orb-chat`
-(`supabase/functions/orb-chat/index.ts`), que guarda a chave e conversa com o Gemini; a chave nunca vai para o navegador.
+(`supabase/functions/orb-chat/index.ts`), que guarda a chave e conversa com o modelo; a chave nunca vai para o navegador.
 
 - Personalidade da esfera: `orb-prompt.txt`, na raiz. Pode editar direto no GitHub: a função lê o arquivo da `main` e,
   em até 5 minutos depois do commit, a esfera já usa o texto novo, sem publicar nada. Se o GitHub não responder, ela usa a
   cópia de reserva `supabase/functions/orb-chat/prompt.ts` (atualizada com `python tools/build_orb_prompt.py` quando a função é publicada).
-- Secret obrigatório no Supabase: `GEMINI_API_KEY` (chave grátis em https://aistudio.google.com/apikey).
-- Opcional: `GEMINI_MODEL` para trocar o modelo (padrão `gemini-2.5-flash`).
+- Secret no Supabase: `NVIDIA_API_KEY` (chave em https://build.nvidia.com). Opcional: `NVIDIA_MODEL` (padrão
+  `nvidia/nemotron-3-ultra-550b-a55b`).
+- Sem `NVIDIA_API_KEY`, a esfera usa o Gemini: `GEMINI_API_KEY` (https://aistudio.google.com/apikey) e, opcional,
+  `GEMINI_MODEL` (padrão `gemini-2.5-flash`).
 - Limites: últimas 12 mensagens, 2000 caracteres por mensagem, 10 perguntas por minuto por pessoa. A conversa some ao recarregar.
 - Para crescer: a função recebe um `mode`; cada modo em `MODES` tem seu próprio prompt (e no futuro ferramentas, dados, outro modelo).
 

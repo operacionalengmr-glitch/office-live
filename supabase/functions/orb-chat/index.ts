@@ -1,5 +1,6 @@
 // Orb chat: the crystal ball in the bosses' lounge (src/orb.js) talks to an AI through this function, so the
-// API key stays in Supabase (secret GEMINI_API_KEY) and never reaches the browser.
+// API key stays in Supabase and never reaches the browser. The model is NVIDIA's Nemotron 3 Ultra (secret
+// NVIDIA_API_KEY, text only); without that secret it falls back to Gemini (secret GEMINI_API_KEY).
 //
 // Request:  POST { mode?: 'chat', messages: [{ role: 'user' | 'model', text }] }
 // Response: { reply: string, model: string }  or  { error: string } with a 4xx/5xx status
@@ -53,6 +54,29 @@ function limited(user: string) {
 
 type Msg = { role: 'user' | 'model'; text: string };
 
+// NVIDIA's API is OpenAI-compatible. Nemotron is a reasoning model: if its thinking comes back inside the
+// answer (<think>…</think>), it's cut out, and the token budget leaves room for it.
+async function nemotron(mode: { system: () => Promise<string>; maxTokens: number }, messages: Msg[], key: string) {
+  const model = Deno.env.get('NVIDIA_MODEL') || 'nvidia/nemotron-3-ultra-550b-a55b';
+  const r = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'system', content: await mode.system() }, ...messages.map(m => ({ role: m.role === 'model' ? 'assistant' : 'user', content: m.text }))],
+      max_tokens: mode.maxTokens * 4, temperature: 0.8,
+    }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const msg = data?.detail || data?.error?.message || data?.error || `HTTP ${r.status}`;
+    throw Object.assign(new Error(String(msg)), { status: r.status === 429 ? 429 : 502 });
+  }
+  const text = String(data?.choices?.[0]?.message?.content || '');
+  const reply = text.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/^[\s\S]*<\/think>/, '').trim();
+  return { reply: reply || '(a esfera ficou em silêncio)', model };
+}
+
 async function gemini(mode: { system: () => Promise<string>; maxTokens: number }, messages: Msg[]) {
   const key = Deno.env.get('GEMINI_API_KEY');
   if (!key) throw new Error('GEMINI_API_KEY não configurada no Supabase');
@@ -95,10 +119,13 @@ Deno.serve(async req => {
     .filter(m => m && (m.role === 'user' || m.role === 'model') && typeof m.text === 'string' && m.text.trim())
     .slice(-MAX_TURNS)
     .map(m => ({ role: m.role, text: m.text.slice(0, MAX_CHARS) }));
-  while (messages.length && messages[0].role !== 'user') messages.shift(); // Gemini wants to start with the user
+  while (messages.length && messages[0].role !== 'user') messages.shift(); // the conversation starts with the user
   if (!messages.length || messages[messages.length - 1].role !== 'user') return json({ error: 'faltou a pergunta' }, 400);
 
-  try { return json(await gemini(mode, messages)); }
+  try {
+    const nvidia = Deno.env.get('NVIDIA_API_KEY');
+    return json(await (nvidia ? nemotron(mode, messages, nvidia) : gemini(mode, messages)));
+  }
   catch (err) {
     console.error('orb-chat', err);
     return json({ error: (err as Error).message }, (err as { status?: number }).status || 500);
