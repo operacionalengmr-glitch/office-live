@@ -632,16 +632,19 @@ function buildProp(p) {
       for (const ax of [0, w - 12]) { R(g, ax, 8, 12, 38, L); R(g, ax + 1, 9, 10, 36, B); R(g, ax + 1, 9, 10, 2, Hh); }
       R(g, 22, 8, 16, 12, '#e8b33a'); R(g, 23, 9, 14, 10, '#f2c14e');
     }); break;
-    case 'coffeeTable': { // wooden coffee table with the crystal ball on top; the fire inside is animated (brighter while its chat is open)
-      const oy = y - 20, cx = x + w / 2, cy = oy + 13, rad = 10;
-      ORB.box = { x: cx - 14, y: oy, w: 28, h: 30 };
+    case 'coffeeTable': addObj(x, y - 4, w, T + 4, sortY, g => {
+      shadow(g, 4, 22, w - 8, 8); R(g, 8, 16, 2, 10, '#2a2e36'); R(g, w - 10, 16, 2, 10, '#2a2e36');
+      R(g, 4, 6, w - 8, 12, '#5d6c7a'); R(g, 5, 7, w - 10, 10, 'rgba(170,205,225,.95)'); R(g, 7, 8, 10, 1, '#ffffff');
+      R(g, 30, 9, 14, 6, '#c9483b'); R(g, 31, 10, 12, 4, '#f2efe8'); R(g, 14, 9, 6, 6, '#e9e4da');
+    }); break;
+    case 'orb': { // crystal ball on the kitchen counter, between the sink and the fruit bowl (no footprint of its own:
+      // the counter is already solid). The fire inside is animated, brighter while its chat is open (orb.js)
+      const cx = x - 12, cy = y - 6, rad = 9, oy = cy - rad - 2;
+      ORB.box = { x: cx - 13, y: oy - 2, w: 26, h: 28 };
       ORB.glow = { x: cx, y: cy };
-      addObj(x, oy, w, T + 20, sortY, g => {
-        shadow(g, 4, 38, w - 8, 8); R(g, 8, 32, 3, 10, OAK.line); R(g, w - 11, 32, 3, 10, OAK.line);
-        block(g, 4, 20, w - 8, 12, 6, OAK);
-        R(g, 8, 23, 9, 6, '#c9483b'); R(g, 9, 24, 7, 4, '#f2efe8'); // a little book
-        shadow(g, cx - x - 9, 24, 18, 5, 0.35);
-        R(g, cx - x - 7, 22, 14, 3, '#6b5a3a'); R(g, cx - x - 6, 22, 12, 1, '#a08654'); // brass ring holding the ball
+      addObj(cx - 12, oy, 24, 24, sortY + 1, g => {
+        shadow(g, 3, 17, 18, 5, 0.35);
+        R(g, 5, 18, 14, 3, '#6b5a3a'); R(g, 6, 18, 12, 1, '#a08654'); // brass ring holding the ball
       }, (g, t) => {
         const hot = ORB.open ? 1 : 0.75;
         for (let py = -rad; py <= rad; py++) for (let px = -rad; px <= rad; px++) {

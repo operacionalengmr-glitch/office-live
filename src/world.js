@@ -58,6 +58,7 @@ function prop(kind, tx, ty, w = 1, h = 1, extra = {}) {
   PROPS.push(p); fill(solid, tx, ty, tx + w - 1, ty + h - 1, 1); return p;
 }
 prop('counter', 9, 2, 10, 1);
+prop('orb', 13, 2); // crystal ball on the counter: click it to chat (src/orb.js)
 prop('fridge', 19, 2, 2, 1);
 prop('vending', 22, 2, 2, 1);
 prop('kitTable', 13, 4, 5, 1);
@@ -72,7 +73,7 @@ prop('sinks', 31, 2, 2, 1);
 prop('plant', 32, 5, 1, 1, { v: 1 });
 // bosses' room
 prop('sofa', 3, 13, 4, 1);
-prop('coffeeTable', 4, 15, 2, 1); // wooden, with the crystal ball on top: click it to chat (src/orb.js)
+prop('coffeeTable', 4, 15, 2, 1);
 prop('plant', 1, 7, 1, 1, { v: 2 });
 prop('plant', 9, 7, 1, 1, { v: 1 });
 prop('plant', 1, 22, 1, 1, { v: 0 });

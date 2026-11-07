@@ -57,7 +57,7 @@ antes disso a TV toca sem som e liga o som no primeiro clique. Vídeos que o don
 
 ## Esfera (chat com IA)
 
-A esfera de cristal na mesa de centro da sala dos chefes abre um chat com a IA do Google (Gemini). Só funciona
+A esfera de cristal na bancada da cozinha (entre a pia e as frutas) abre um chat com a IA do Google (Gemini). Só funciona
 logado com o e-mail do ponto (`@engmr.com.br`). O navegador chama a Edge Function `orb-chat`
 (`supabase/functions/orb-chat/index.ts`), que guarda a chave e conversa com o Gemini; a chave nunca vai para o navegador.
 
