@@ -55,6 +55,20 @@ O estado fica no Supabase (`supabase/office_tv.sql`): a fila, o vídeo atual e q
 O jogo escuta mudanças por Realtime e ajusta o player (`src/tv.js`). O navegador só deixa tocar com som depois de um clique na página;
 antes disso a TV toca sem som e liga o som no primeiro clique. Vídeos que o dono bloqueou para incorporação são pulados.
 
+## Esfera (chat com IA)
+
+A esfera de cristal na mesa de centro da sala dos chefes abre um chat com a IA do Google (Gemini). Só funciona
+logado com o e-mail do ponto (`@engmr.com.br`). O navegador chama a Edge Function `orb-chat`
+(`supabase/functions/orb-chat/index.ts`), que guarda a chave e conversa com o Gemini; a chave nunca vai para o navegador.
+
+- Personalidade da esfera: `orb-prompt.txt`, na raiz. Pode editar direto no GitHub: a função lê o arquivo da `main` e,
+  em até 5 minutos depois do commit, a esfera já usa o texto novo, sem publicar nada. Se o GitHub não responder, ela usa a
+  cópia de reserva `supabase/functions/orb-chat/prompt.ts` (atualizada com `python tools/build_orb_prompt.py` quando a função é publicada).
+- Secret obrigatório no Supabase: `GEMINI_API_KEY` (chave grátis em https://aistudio.google.com/apikey).
+- Opcional: `GEMINI_MODEL` para trocar o modelo (padrão `gemini-2.5-flash`).
+- Limites: últimas 12 mensagens, 2000 caracteres por mensagem, 10 perguntas por minuto por pessoa. A conversa some ao recarregar.
+- Para crescer: a função recebe um `mode`; cada modo em `MODES` tem seu próprio prompt (e no futuro ferramentas, dados, outro modelo).
+
 ## Sair pra rua (multiplayer)
 
 Quem não está trabalhando (ponto em pausa ou fora) pode clicar na porta do escritório e sair para a Av. João Câncio da Silva.

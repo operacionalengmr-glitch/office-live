@@ -54,6 +54,19 @@ export async function whoAmI() {
   return data || null;
 }
 
+/* ---------- crystal orb (supabase/functions/orb-chat) ----------
+   messages: [{ role: 'user' | 'model', text }] -> { reply, model }. The AI key lives in the function's secrets. */
+export async function askOrb(messages, mode = 'chat') {
+  const sb = await client();
+  const { data, error } = await sb.functions.invoke('orb-chat', { body: { mode, messages } });
+  if (error) {
+    let msg = error.message;
+    try { msg = (await error.context.json()).error || msg; } catch {} // the function's own error text
+    throw new Error(msg);
+  }
+  return data;
+}
+
 /* ---------- office TV (supabase/office_tv.sql) ----------
    Anyone can read the shared queue; only signed-in @engmr.com.br accounts can change it. */
 // -> { now, can_edit, state: { entry_id, video_id, title, added_by, started_at, paused_pos }, queue: [{ id, video_id, title, added_by }] }

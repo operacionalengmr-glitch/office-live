@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <!-- bump ?v= on each release: GitHub Pages lets browsers cache files for 10 minutes -->
-<link rel="stylesheet" href="css/style.css?v=10">
+<link rel="stylesheet" href="css/style.css?v=11">
 </head>
 <body>
 <div id="stage"><canvas id="game"></canvas></div>
@@ -63,6 +63,12 @@
   <ol class="queue"></ol>
 </div>
 
+<div id="orbChat" hidden>
+  <div class="rhead"><b>🔮 Esfera</b><span><button data-a="clear" title="Começar de novo">Limpar</button><button class="x" aria-label="Fechar">✕</button></span></div>
+  <ol class="log" aria-live="polite"></ol>
+  <form><textarea rows="2" maxlength="2000" placeholder="Pergunte algo… (Enter envia)"></textarea><button type="submit">Enviar</button></form>
+</div>
+
 <div id="toasts"></div>
 <div id="fade"></div>
 
@@ -83,6 +89,6 @@
   <small>clique para entrar</small>
 </div>
 
-<script type="module" src="src/main.js?v=18"></script>
+<script type="module" src="src/main.js?v=19"></script>
 </body>
 </html>

@@ -228,3 +228,26 @@ body.live .st { display: none; }
 #dunUi .opts { display: flex; gap: 6px; flex-wrap: wrap; }
 #dunUi .tip { color: #8a8f99; font-size: 10px; }
 @media (max-width: 760px) { #dunUi { inset: 0; } #dunUi .wr { grid-template-columns: 1fr; } #dunUi nav { flex-direction: row; overflow-x: auto; max-height: 64px; } #dunUi nav button { min-width: 150px; } }
+
+/* ---------- crystal orb chat (src/orb.js) ---------- */
+#orbChat { position: fixed; z-index: 8; left: 12px; bottom: 14px; width: min(380px, calc(100% - var(--panelW) - 24px)); height: min(460px, calc(100% - 90px)); background: rgba(16, 10, 8, .94); border: 1px solid #7a3a1a; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 9px; backdrop-filter: blur(6px); box-shadow: 0 12px 40px rgba(0, 0, 0, .45), 0 0 30px rgba(255, 120, 40, .15); animation: up .2s ease-out; }
+#orbChat[hidden] { display: none; }
+#orbChat .rhead { display: flex; justify-content: space-between; align-items: center; font: 700 15px var(--pixel); color: #ffe2c4; }
+#orbChat .rhead span { display: flex; gap: 6px; align-items: center; }
+#orbChat button { font: 600 12px var(--pixel); color: #ffe2c4; background: #24140e; border: 1px solid #5a2c16; border-radius: 8px; padding: 6px 10px; }
+#orbChat button:hover:not(:disabled) { border-color: #ff8a1f; }
+#orbChat button:disabled { opacity: .45; cursor: default; }
+#orbChat .x { background: none; border: 0; color: #b08a70; font-size: 14px; }
+#orbChat .log { flex: 1; overflow: auto; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 7px; }
+#orbChat .log li { max-width: 85%; padding: 7px 10px; border-radius: 10px; font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+#orbChat .log .user { align-self: flex-end; background: #2d4f95; color: #fff; border-bottom-right-radius: 3px; }
+#orbChat .log .model { align-self: flex-start; background: #2a1810; border: 1px solid #5a2c16; color: #ffe2c4; border-bottom-left-radius: 3px; }
+#orbChat .log code { font: 11px var(--mono); background: rgba(0, 0, 0, .35); padding: 0 3px; border-radius: 3px; }
+#orbChat .log .hint { align-self: center; color: #b08a70; font-style: italic; }
+#orbChat .log .err { align-self: center; color: #ff9b7a; font-size: 11px; text-align: center; }
+#orbChat .wait span { display: inline-block; width: 5px; height: 5px; margin: 0 2px; border-radius: 50%; background: #ff8a1f; animation: pulse 1s infinite; }
+#orbChat .wait span:nth-child(2) { animation-delay: .2s; } #orbChat .wait span:nth-child(3) { animation-delay: .4s; }
+#orbChat form { display: flex; gap: 6px; align-items: stretch; }
+#orbChat textarea { flex: 1; min-width: 0; resize: none; font: 12px var(--mono); color: #ffe2c4; background: #1a0f0a; border: 1px solid #5a2c16; border-radius: 8px; padding: 7px 10px; }
+#orbChat textarea:focus { outline: 2px solid #ff8a1f; outline-offset: 0; }
+#orbChat form button { background: #a8441a; border-color: #ff8a1f; color: #fff; }

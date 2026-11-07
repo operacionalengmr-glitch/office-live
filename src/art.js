@@ -181,6 +181,7 @@ export function buildShafts(p = 0.5) {
 export const OBJECTS = [];
 export const LIGHTS = [];
 export const TV = { screen: null, box: null }; // world rects, filled when the TV prop is built
+export const ORB = { box: null, glow: null };  // filled when the orb prop is built (see orb.js)
 function addObj(x, y, w, h, sortY, paint, anim) {
   const [c, g] = cv(w, h); paint(g);
   const o = { x, y, w, h, sortY, c, anim, draw(ctx, t, S) { ctx.drawImage(c, x, y); if (anim) anim(ctx, t, S, o); } };
@@ -631,11 +632,32 @@ function buildProp(p) {
       for (const ax of [0, w - 12]) { R(g, ax, 8, 12, 38, L); R(g, ax + 1, 9, 10, 36, B); R(g, ax + 1, 9, 10, 2, Hh); }
       R(g, 22, 8, 16, 12, '#e8b33a'); R(g, 23, 9, 14, 10, '#f2c14e');
     }); break;
-    case 'coffeeTable': addObj(x, y - 4, w, T + 4, sortY, g => {
-      shadow(g, 4, 22, w - 8, 8); R(g, 8, 16, 2, 10, '#2a2e36'); R(g, w - 10, 16, 2, 10, '#2a2e36');
-      R(g, 4, 6, w - 8, 12, '#5d6c7a'); R(g, 5, 7, w - 10, 10, 'rgba(170,205,225,.95)'); R(g, 7, 8, 10, 1, '#ffffff');
-      R(g, 30, 9, 14, 6, '#c9483b'); R(g, 31, 10, 12, 4, '#f2efe8'); R(g, 14, 9, 6, 6, '#e9e4da');
-    }); break;
+    case 'coffeeTable': { // wooden coffee table with the crystal ball on top; the fire inside is animated (brighter while its chat is open)
+      const oy = y - 20, cx = x + w / 2, cy = oy + 13, rad = 10;
+      ORB.box = { x: cx - 14, y: oy, w: 28, h: 30 };
+      ORB.glow = { x: cx, y: cy };
+      addObj(x, oy, w, T + 20, sortY, g => {
+        shadow(g, 4, 38, w - 8, 8); R(g, 8, 32, 3, 10, OAK.line); R(g, w - 11, 32, 3, 10, OAK.line);
+        block(g, 4, 20, w - 8, 12, 6, OAK);
+        R(g, 8, 23, 9, 6, '#c9483b'); R(g, 9, 24, 7, 4, '#f2efe8'); // a little book
+        shadow(g, cx - x - 9, 24, 18, 5, 0.35);
+        R(g, cx - x - 7, 22, 14, 3, '#6b5a3a'); R(g, cx - x - 6, 22, 12, 1, '#a08654'); // brass ring holding the ball
+      }, (g, t) => {
+        const hot = ORB.open ? 1 : 0.75;
+        for (let py = -rad; py <= rad; py++) for (let px = -rad; px <= rad; px++) {
+          const d = Math.hypot(px, py); if (d > rad + 0.4) continue;
+          if (d > rad - 0.9) { R(g, cx + px, cy + py, 1, 1, '#3a1608'); continue; } // rim
+          const a = Math.atan2(py, px), swirl = Math.sin(a * 3 + t * 2.2 - d * 0.55) + Math.sin(a * 2 - t * 1.3 + d * 0.4) * 0.6;
+          const heat = Math.max(0, Math.min(1, (1 - d / rad) * 1.1 + swirl * 0.22)) * hot;
+          const col = heat > 0.78 ? '#fff1b8' : heat > 0.6 ? '#ffc04a' : heat > 0.42 ? '#ff8a1f' : heat > 0.26 ? '#d9481a' : heat > 0.12 ? '#8f2410' : '#4a1408';
+          R(g, cx + px, cy + py, 1, 1, col);
+        }
+        const k = (Math.sin(t * 3) + 1) / 2; // dark slit in the core that "breathes"
+        R(g, cx - 0.5, cy - 3 - k, 1, 6 + 2 * k, '#2a0a04');
+        R(g, cx - 6, cy - 7, 3, 2, 'rgba(255,255,255,.55)'); R(g, cx - 7, cy - 5, 1, 2, 'rgba(255,255,255,.35)'); // glass shine
+      });
+      LIGHTS.push({ x: cx, y: cy, r: 90, col: '255,140,60', a: 0.7, when: 'always' }); break;
+    }
     case 'lamp': addObj(x, y - 48, T, T + 48, sortY, g => {
       shadow(g, 8, 70, 16, 6); R(g, 15, 14, 2, 56, '#2a2a2a'); R(g, 10, 70, 12, 2, '#2a2a2a');
       g.fillStyle = OUT; g.beginPath(); g.moveTo(8, 16); g.lineTo(24, 16); g.lineTo(20, 2); g.lineTo(12, 2); g.fill();

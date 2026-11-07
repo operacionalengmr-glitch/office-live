@@ -7,6 +7,7 @@ import { Actor } from './actors.js';
 import * as UI from './ui.js';
 import * as Live from './supabase.js';
 import * as TVR from './tv.js';
+import * as Orb from './orb.js';
 import * as Out from './outside.js';
 import * as Gym from './smartfit.js';
 import * as Dun from './dungeon.js';
@@ -196,7 +197,7 @@ addEventListener('keydown', e => {
   if (MOVE[e.code] && (Out.out.active || Gym.gym.active || Dun.dun.active)) { game.keys[MOVE[e.code]] = true; e.preventDefault(); return; }
   if (e.repeat) return;
   if (Dun.dun.active && Dun.battleKey(e.code)) { e.preventDefault(); return; }
-  if (e.code === 'Escape') { game.deselect(); TVR.close(); }
+  if (e.code === 'Escape') { game.deselect(); TVR.close(); Orb.close(); }
   if (e.code === 'KeyN') game.showNames = !game.showNames;
   if (e.code === 'KeyL') game.cycleLight();
   if (e.code === 'Equal' || e.code === 'NumpadAdd') game.userZoom = Math.min(2.5, game.userZoom * 1.15);
@@ -222,7 +223,7 @@ cvs.addEventListener('mousemove', e => {
   if (Gym.gym.active) { game.hover = null; cvs.style.cursor = Gym.overDoor(w.x, w.y) || Gym.overStairs(w.x, w.y) || Gym.overBasement(w.x, w.y) ? 'pointer' : 'default'; return; }
   if (Out.out.active) { game.hover = null; cvs.style.cursor = Out.overDoor(w.x, w.y) || Out.overGym(w.x, w.y) ? 'pointer' : 'default'; return; }
   game.hover = pick(w.x, w.y);
-  cvs.style.cursor = game.hover || TVR.overTV(w.x, w.y) || overOfficeDoor(w.x, w.y) ? 'pointer' : 'default';
+  cvs.style.cursor = game.hover || TVR.overTV(w.x, w.y) || Orb.overOrb(w.x, w.y) || overOfficeDoor(w.x, w.y) ? 'pointer' : 'default';
 });
 cvs.addEventListener('mouseleave', () => { game.hover = null; });
 cvs.addEventListener('mousedown', e => {
@@ -234,6 +235,7 @@ cvs.addEventListener('mousedown', e => {
   const a = pick(w.x, w.y);
   if (a) game.select(a);
   else if (TVR.overTV(w.x, w.y)) TVR.open();
+  else if (Orb.overOrb(w.x, w.y)) Orb.toggle();
   else if (overOfficeDoor(w.x, w.y)) game.walkOut();
   else game.deselect();
 });
@@ -570,6 +572,7 @@ async function boot() {
   UI.runIntro(game.actors);
   requestAnimationFrame(frame);
   TVR.initTV();
+  Orb.initOrb();
   startWeather();
 }
 boot();
