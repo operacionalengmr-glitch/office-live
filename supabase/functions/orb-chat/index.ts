@@ -124,7 +124,9 @@ Deno.serve(async req => {
 
   try {
     const nvidia = Deno.env.get('NVIDIA_API_KEY');
-    return json(await (nvidia ? nemotron(mode, messages, nvidia) : gemini(mode, messages)));
+    const res = await (nvidia ? nemotron(mode, messages, nvidia) : gemini(mode, messages));
+    console.log('orb-chat answered by', res.model); // shows in the function logs which model is live
+    return json(res);
   }
   catch (err) {
     console.error('orb-chat', err);
